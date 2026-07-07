@@ -10,7 +10,7 @@
 <meta name="description" content="Universal Point of Sale by Reymar Arroyo" />
 <title>Arroyo POS</title>
 <link rel="manifest" href="manifest.json" />
-<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@tabler/icons-webfont@latest/tabler-icons.min.css" />
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@tabler/icons-webfont@3.19.0/dist/tabler-icons.min.css" crossorigin="anonymous" />
 <style>
   :root {
     --surface-0: #f4f4f2;
@@ -669,7 +669,7 @@ function renderModal(body) {
   body.appendChild(ov);
 }
 
-load(); render();
+try { load(); render(); } catch(e) { document.getElementById('app').innerHTML = '<div style="padding:40px;text-align:center;font-family:sans-serif"><h2>Arroyo POS</h2><p style="color:#666;margin-top:8px">Loading...</p><p style="color:#999;font-size:12px;margin-top:16px">Error: '+e.message+'</p></div>'; console.error(e); }
 
 // Register service worker for PWA/offline support
 if ('serviceWorker' in navigator) {
