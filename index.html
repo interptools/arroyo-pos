@@ -105,7 +105,7 @@ input,select,textarea{user-select:text;-webkit-user-select:text}
 .disc-row select{padding:9px 8px;border-radius:10px;border:1.5px solid var(--b2);background:var(--bg2);color:var(--t1);font-size:14px;outline:none}
 .sum{display:flex;justify-content:space-between;font-size:13px;color:var(--t2);padding:3px 0}
 .sum-total{display:flex;justify-content:space-between;font-size:18px;font-weight:800;padding:8px 0 10px;border-top:1px solid var(--b1);margin-top:4px}
-.pay-grid{display:grid;grid-template-columns:1fr 1fr;gap:9px}
+.pay-grid{display:grid;grid-template-columns:1fr 1fr 1fr;gap:9px}
 .pbtn{padding:14px 8px;border-radius:12px;border:1.5px solid var(--b2);background:var(--bg2);color:var(--t1);font-size:14px;font-weight:700;cursor:pointer;text-align:center;display:block;width:100%}
 .pbtn:active{background:var(--bg3);transform:scale(0.97)}
 .pbtn.big{grid-column:1/-1;background:var(--ac);color:#fff;border-color:var(--ac);font-size:16px;font-weight:800;padding:18px;border-radius:14px}
@@ -764,7 +764,25 @@ function renderAdmin(scr){
   clrSalesBtn.onclick=function(){if(confirm('Clear all sales data?')){S.sales=[];S.salesTotal=0;save();render();toast('Cleared');}};
   clrSalesRow.appendChild(clrSalesBtn);sec3.appendChild(clrSalesRow);scroll.appendChild(sec3);
 
-  // Change password
+  // Daily Sales Report
+  const secReport=document.createElement('div');secReport.className='asec';
+  secReport.innerHTML='<div class="asec-t">Daily sales report</div>';
+  const dateRow=document.createElement('div');dateRow.style.cssText='display:flex;align-items:center;gap:8px';
+  const dateInp=document.createElement('input');dateInp.type='date';dateInp.id='reportDate';
+  dateInp.value=new Date().toISOString().slice(0,10);
+  dateInp.style.cssText='flex:1;padding:11px 12px;border-radius:10px;border:1.5px solid var(--b2);background:var(--bg1);color:var(--t1);font-size:14px;outline:none';
+  const viewBtn=document.createElement('button');viewBtn.className='abtn pri';viewBtn.textContent='View report';
+  viewBtn.onclick=function(){openModal({type:'dailyReport',date:document.getElementById('reportDate').value,label:'Selected date'});};
+  dateRow.appendChild(dateInp);dateRow.appendChild(viewBtn);secReport.appendChild(dateRow);
+  const quickRow=document.createElement('div');quickRow.style.cssText='display:flex;gap:6px;flex-wrap:wrap';
+  [{l:'Today',r:null},{l:'Yesterday',r:'yesterday'},{l:'This week',r:'week'},{l:'This month',r:'month'}].forEach(function(q){
+    const qb=document.createElement('button');qb.className='abtn';qb.textContent=q.l;qb.style.cssText='font-size:12px;padding:7px 12px';
+    qb.onclick=function(){openModal({type:'dailyReport',date:new Date().toISOString().slice(0,10),range:q.r,label:q.l});};
+    quickRow.appendChild(qb);
+  });
+  secReport.appendChild(quickRow);scroll.appendChild(secReport);
+
+    // Change password
   const sec4=document.createElement('div');sec4.className='asec';
   sec4.innerHTML='<div class="asec-t">Change password</div><div class="arow"><label>Current password</label><input type="password" id="aCur" placeholder="Current password" /></div><div class="arow"><label>New password</label><input type="password" id="aNew" placeholder="Min 4 characters" /></div><div class="arow"><label>Confirm new</label><input type="password" id="aCon" placeholder="Confirm" /></div>';
   const pwRow=document.createElement('div');pwRow.className='abtnrow';
@@ -1053,7 +1071,79 @@ function renderModal(app){
     btns.appendChild(cancel);btns.appendChild(del);body.appendChild(btns);
   }
 
-  modal.appendChild(body);
+  else if(m.type==='dailyReport'){
+    const date=m.date;const range=m.range;const label=m.label||date;
+    // Filter sales
+    let filtered=S.sales.filter(function(s){
+      const sd=new Date(s.date);
+      if(range==='week'){const w=new Date();w.setDate(w.getDate()-7);return sd>=w;}
+      if(range==='month'){const mo=new Date();mo.setDate(mo.getDate()-30);return sd>=mo;}
+      if(range==='yesterday'){const y=new Date();y.setDate(y.getDate()-1);return sd.toDateString()===y.toDateString();}
+      return sd.toISOString().slice(0,10)===date;
+    });
+    const totalAmt=filtered.reduce(function(a,s){return a+s.total;},0);
+    const cashAmt=filtered.filter(function(s){return s.method==='Cash';}).reduce(function(a,s){return a+s.total;},0);
+    const cardAmt=filtered.filter(function(s){return s.method==='Card';}).reduce(function(a,s){return a+s.total;},0);
+    const gcashAmt=filtered.filter(function(s){return s.method==='GCash';}).reduce(function(a,s){return a+s.total;},0);
+
+    const titleEl=document.createElement('div');titleEl.className='mtitle';titleEl.textContent='Sales Report - '+label;body.appendChild(titleEl);
+
+    // Summary cards
+    const sumGrid=document.createElement('div');sumGrid.style.cssText='display:grid;grid-template-columns:1fr 1fr;gap:8px';
+    [{l:'Total sales',v:filtered.length+' txns',big:false},{l:'Total revenue',v:fmt(totalAmt),big:true},{l:'Cash',v:fmt(cashAmt),big:false},{l:'Card',v:fmt(cardAmt),big:false},{l:'GCash',v:fmt(gcashAmt),big:false},{l:'Avg sale',v:filtered.length?fmt(totalAmt/filtered.length):fmt(0),big:false}].forEach(function(s){
+      const box=document.createElement('div');box.style.cssText='background:var(--bg0);border-radius:12px;padding:12px';
+      box.innerHTML='<div style="font-size:10px;font-weight:700;color:var(--t3);text-transform:uppercase;letter-spacing:0.5px;margin-bottom:4px">'+s.l+'</div><div style="font-size:'+(s.big?'20':'16')+'px;font-weight:800;color:'+(s.big?'var(--ac)':'var(--t1)')+'">'+s.v+'</div>';
+      sumGrid.appendChild(box);
+    });
+    body.appendChild(sumGrid);
+
+    // Transaction list
+    if(filtered.length>0){
+      const listHd=document.createElement('div');listHd.style.cssText='font-size:12px;font-weight:700;color:var(--t3);text-transform:uppercase;letter-spacing:0.5px;padding:4px 0';listHd.textContent='Transactions';body.appendChild(listHd);
+      filtered.slice().reverse().forEach(function(s){
+        const row=document.createElement('div');row.style.cssText='display:flex;align-items:center;gap:10px;padding:10px 0;border-bottom:1px solid var(--b1);cursor:pointer';
+        const tl=document.createElement('div');tl.style.flex='1';
+        tl.innerHTML='<div style="font-size:12px;color:var(--t3);margin-bottom:2px">'+s.id+(s.ref?' - Ref: '+s.ref:'')+'</div><div style="font-size:13px;font-weight:600">'+s.items.map(function(i){return i.name+' x'+i.qty;}).join(', ')+'</div><div style="font-size:11px;color:var(--t2);margin-top:2px">'+new Date(s.date).toLocaleTimeString([],{hour:'2-digit',minute:'2-digit'})+'</div>';
+        const tr=document.createElement('div');tr.style.cssText='text-align:right;flex-shrink:0';
+        tr.innerHTML='<div style="font-size:14px;font-weight:800">'+fmt(s.total)+'</div><div style="font-size:10px;font-weight:700;padding:2px 7px;border-radius:20px;display:inline-block;margin-top:2px;background:var(--sg);color:var(--st)">'+s.method+'</div>';
+        row.appendChild(tl);row.appendChild(tr);
+        row.onclick=function(){closeModal();openModal({type:'viewtx',tx:s});};
+        body.appendChild(row);
+      });
+    } else {
+      const empty=document.createElement('div');empty.style.cssText='text-align:center;color:var(--t3);font-size:14px;padding:32px 0';empty.textContent='No transactions found.';body.appendChild(empty);
+    }
+
+    // Print button
+    const printRow=document.createElement('div');printRow.style.cssText='display:flex;gap:8px;justify-content:flex-end;margin-top:8px';
+    const closeB=document.createElement('button');closeB.textContent='Close';closeB.onclick=closeModal;
+    const printB=document.createElement('button');printB.className='abtn pri';printB.textContent='Print report';
+    printB.onclick=function(){
+      const pa=document.getElementById('print-area');
+      const w=32;const line='-'.repeat(w);
+      const lp=function(s,n){return String(s).length>=n?String(s).slice(0,n):String(s)+' '.repeat(n-String(s).length);};
+      const rp=function(s,n){return String(s).length>=n?String(s).slice(0,n):' '.repeat(n-String(s).length)+String(s);};
+      let rows=[lp(S.bizName,w),line,'DAILY SALES REPORT',label,new Date().toLocaleString(),line,
+        'Total transactions: '+filtered.length,
+        lp('Total revenue:',w-fmt(totalAmt).length)+fmt(totalAmt),
+        lp('Cash:',w-fmt(cashAmt).length)+fmt(cashAmt),
+        lp('Card:',w-fmt(cardAmt).length)+fmt(cardAmt),
+        lp('GCash:',w-fmt(gcashAmt).length)+fmt(gcashAmt),
+        line,'TRANSACTIONS',line];
+      filtered.slice().reverse().forEach(function(s){
+        rows.push(s.id+' '+new Date(s.date).toLocaleTimeString([],{hour:'2-digit',minute:'2-digit'}));
+        rows.push(s.items.map(function(i){return i.name+' x'+i.qty;}).join(', '));
+        if(s.ref)rows.push('Ref: '+s.ref);
+        const tot=fmt(s.total);rows.push(lp(s.method,w-tot.length)+tot);rows.push('');
+      });
+      rows.push(line);rows.push(rp('Powered by Arroyo POS',w));
+      pa.innerHTML='<pre style="font-family:monospace;font-size:12px;color:#000">'+rows.join('\n')+'</pre>';
+      window.print();
+    };
+    printRow.appendChild(closeB);printRow.appendChild(printB);body.appendChild(printRow);
+  }
+
+    modal.appendChild(body);
   ov.appendChild(modal);
   app.appendChild(ov);
 }
