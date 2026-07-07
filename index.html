@@ -739,6 +739,11 @@ function renderModal(app){
   ov.querySelector('#mClose')?.addEventListener('click',closeModal);
 
   if(m.type==='pay'&&m.method==='Cash'){
+    ov.querySelector('#cashManual')?.addEventListener('input',e=>{
+      const v=parseFloat(e.target.value)||0;
+      S.cashTendered=v;
+      openModal({type:'pay',method:'Cash'});
+    });
     ov.querySelector('#qkExact')?.addEventListener('click',()=>{S.cashTendered=Math.ceil(tot()/50)*50;openModal({type:'pay',method:'Cash'});});
     ov.querySelectorAll('.qk-btn[data-add]').forEach(b=>b.addEventListener('click',()=>{const a=+b.dataset.add;S.cashTendered=a===0?0:(S.cashTendered||0)+a;openModal({type:'pay',method:'Cash'});}));
   }
