@@ -3,6 +3,6 @@
   "target": {
     "namespace": "android_app",
     "package_name": "io.github.interptools.twa",
-    "sha256_cert_fingerprints": ["43:1F:4F:99:29:62:12:E3:B6:21:62:D6:CB:38:04:74:A6:17:32:60:B7:07:34:49:28:A1:E8:27:48:69:C2:46"]
+    "sha256_cert_fingerprints": ["27:10:E4:20:F7:9C:77:09:61:80:C8:56:F1:D4:C5:8D:5B:1A:EB:08:C8:50:F7:4A:A5:94:E6:2C:8B:84:53:80"]
   }
 }]
