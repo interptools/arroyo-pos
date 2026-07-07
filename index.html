@@ -689,12 +689,48 @@ function renderAdmin(scr){
 
   // Background color
   const sec2=document.createElement('div');sec2.className='asec';
-  sec2.innerHTML='<div class="asec-t">Background color</div><p style="font-size:13px;color:var(--t2);line-height:1.6">Choose the background color for the entire app.</p><div style="display:flex;align-items:center;gap:14px;padding:4px 0"><input type="color" id="colorPicker" value="'+S.themeColor+'" style="width:56px;height:56px;border-radius:12px;border:2px solid var(--b2);background:none;cursor:pointer;padding:2px" /><div style="flex:1"><div style="font-size:16px;font-weight:700" id="colorLabel">'+S.themeColor+'</div><div style="font-size:12px;color:var(--t3);margin-top:2px">Tap to open color picker</div></div><button class="abtn pri" id="applyColor">Apply</button></div><div class="cp-row"><button class="cp" data-c="#111110" style="background:#111110">Dark</button><button class="cp" data-c="#1a2a1a" style="background:#1a2a1a">Forest</button><button class="cp" data-c="#1a1a2e" style="background:#1a1a2e">Night</button><button class="cp" data-c="#2c1a1a" style="background:#2c1a1a">Wine</button><button class="cp" data-c="#1a2a3a" style="background:#1a2a3a">Navy</button><button class="cp light" data-c="#f5f0e8" style="background:#f5f0e8">Cream</button><button class="cp light" data-c="#f0f4f0" style="background:#f0f4f0">Mint</button></div>';
+  sec2.innerHTML='<div class="asec-t">Background color</div><p style="font-size:13px;color:var(--t2);line-height:1.6">Pick a preset or enter a hex code (e.g. #1a2a3a)</p>';
+
+  const colorRow=document.createElement('div');
+  colorRow.style.cssText='display:flex;align-items:center;gap:12px;margin-bottom:8px';
+  const colorPreview=document.createElement('div');
+  colorPreview.style.cssText='width:52px;height:52px;border-radius:12px;border:2px solid var(--b2);background:'+S.themeColor+';flex-shrink:0;cursor:pointer';
+  const hexInp=document.createElement('input');
+  hexInp.type='text';hexInp.value=S.themeColor;hexInp.placeholder='#111110';
+  hexInp.style.cssText='flex:1;padding:12px;border-radius:10px;border:1.5px solid var(--b2);background:var(--bg1);color:var(--t1);font-size:16px;font-weight:700;outline:none;letter-spacing:1px';
+  hexInp.oninput=function(){
+    const v=this.value.trim();
+    if(/^#[0-9a-fA-F]{6}$/.test(v)){
+      S.themeColor=v;colorPreview.style.background=v;applyTheme(v);
+    }
+  };
+  const saveColorBtn=document.createElement('button');
+  saveColorBtn.className='abtn pri';saveColorBtn.textContent='Save';saveColorBtn.style.cssText='flex-shrink:0;padding:12px 16px';
+  saveColorBtn.onclick=function(){save();toast('Color saved!');};
+  colorRow.appendChild(colorPreview);colorRow.appendChild(hexInp);colorRow.appendChild(saveColorBtn);
+  sec2.appendChild(colorRow);
+
+  const presetRow=document.createElement('div');presetRow.className='cp-row';
+  [
+    {c:'#111110',l:'Dark'},{c:'#1a2a1a',l:'Forest'},{c:'#1a1a2e',l:'Night'},
+    {c:'#2c1a1a',l:'Wine'},{c:'#1a2a3a',l:'Navy'},{c:'#2a1f0e',l:'Mocha'},
+    {c:'#f5f0e8',l:'Cream',light:true},{c:'#f0f4f0',l:'Mint',light:true},
+  ].forEach(function(p){
+    const btn=document.createElement('button');
+    btn.className='cp'+(p.light?' light':'');
+    btn.style.cssText='background:'+p.c+(p.light?';color:#333':'');
+    btn.textContent=p.l;
+    btn.onclick=function(){
+      S.themeColor=p.c;
+      hexInp.value=p.c;colorPreview.style.background=p.c;
+      applyTheme(p.c);save();toast(p.l+' applied!');
+    };
+    presetRow.appendChild(btn);
+  });
+  sec2.appendChild(presetRow);
   scroll.appendChild(sec2);
 
-  // Sales summary
-  const tx30=S.sales.filter(s=>new Date(s.date)>=new Date(Date.now()-30*86400000));
-  const avg=S.sales.length?S.salesTotal/S.sales.length:0;
+
   const sec3=document.createElement('div');sec3.className='asec';
   sec3.innerHTML='<div class="asec-t">Sales summary</div><div class="stats" style="padding:0;grid-template-columns:repeat(3,1fr)"><div class="stat"><div class="stat-l">Transactions</div><div class="stat-v">'+S.sales.length+'</div></div><div class="stat"><div class="stat-l">Revenue</div><div class="stat-v" style="font-size:14px">'+fmt(S.salesTotal)+'</div></div><div class="stat"><div class="stat-l">Avg sale</div><div class="stat-v" style="font-size:14px">'+fmt(avg)+'</div></div></div><div class="stats" style="padding:8px 0 0;grid-template-columns:repeat(3,1fr)"><div class="stat"><div class="stat-l">30-day txns</div><div class="stat-v">'+tx30.length+'</div></div><div class="stat"><div class="stat-l">30-day rev.</div><div class="stat-v" style="font-size:14px">'+fmt(tx30.reduce((a,s)=>a+s.total,0))+'</div></div><div class="stat"><div class="stat-l">Products</div><div class="stat-v">'+S.prods.length+'</div></div></div>';
   const clrSalesRow=document.createElement('div');clrSalesRow.className='abtnrow';
@@ -746,22 +782,7 @@ function renderAdmin(scr){
   scroll.appendChild(sec7);
   scr.appendChild(scroll);
 
-  // Wire up color picker
-  const picker=document.getElementById('colorPicker');
-  const label=document.getElementById('colorLabel');
-  if(picker){
-    picker.oninput=function(){S.themeColor=this.value;if(label)label.textContent=this.value;applyTheme(this.value);};
-  }
-  document.querySelectorAll('.cp').forEach(b=>{
-    b.onclick=function(){
-      S.themeColor=this.dataset.c;
-      if(picker)picker.value=this.dataset.c;
-      if(label)label.textContent=this.dataset.c;
-      applyTheme(this.dataset.c);
-    };
-  });
-  const applyBtn=document.getElementById('applyColor');
-  if(applyBtn)applyBtn.onclick=function(){save();toast('Color saved!');};
+
 }
 
 function renderAbout(scr){
