@@ -488,10 +488,10 @@ function renderPOS(main){
     +'<div class="sum-line"><span>VAT 12%</span><span>'+fmt(tamt())+'</span></div>'
     +'<div class="sum-total-line"><span>Total</span><span>'+fmt(tot())+'</span></div>'
     +'<div class="pay-row">'
-    +'<button class="pay-btn" data-pay="Cash" style="background:#27500a;color:#c0dd97;border-color:#27500a">CASH</button>'
-    +'<button class="pay-btn" data-pay="Card" style="background:#0c447c;color:#85b7eb;border-color:#0c447c">CARD</button>'
-    +'<button class="pay-btn" data-pay="GCash" style="background:#3c3489;color:#afa9ec;border-color:#3c3489">GCASH</button>'
-    +'<button class="pay-btn" data-pay="Transfer" style="background:#633806;color:#fac775;border-color:#633806">TRANSFER</button>'
+    +'<button class="pay-btn" data-pay="Cash">CASH</button>'
+    +'<button class="pay-btn" data-pay="Card">CARD</button>'
+    +'<button class="pay-btn" data-pay="GCash">GCASH</button>'
+    +'<button class="pay-btn" data-pay="Transfer">TRANSFER</button>'
     +'<button class="pay-btn main-pay" data-pay="Cash">Checkout - '+fmt(tot())+'</button>'
     +'</div></div>';
 
@@ -508,10 +508,14 @@ function renderPOS(main){
   sheet.querySelectorAll('.qbtn').forEach(b=>b.addEventListener('click',()=>chgQty(+b.dataset.id,+b.dataset.d)));
   sheet.querySelector('#discIn')?.addEventListener('input',e=>{S.disc=parseFloat(e.target.value)||0;render();});
   sheet.querySelector('#discSel')?.addEventListener('change',e=>{S.discType=e.target.value;render();});
-  sheet.querySelectorAll('.pay-btn[data-pay]').forEach(b=>b.addEventListener('click',()=>{
-    if(!S.cart.length){toast('Cart is empty');return;}
-    S.cashTendered=0;openModal({type:'pay',method:b.dataset.pay});
-  }));
+  sheet.addEventListener('click',e=>{
+    const pb=e.target.closest('.pay-btn[data-pay]');
+    if(pb){
+      e.stopPropagation();
+      if(!S.cart.length){toast('Cart is empty');return;}
+      S.cashTendered=0;openModal({type:'pay',method:pb.dataset.pay});
+    }
+  });
   main.appendChild(w);
 }
 
