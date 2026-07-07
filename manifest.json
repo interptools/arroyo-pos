@@ -2,14 +2,22 @@
   "name": "Arroyo POS",
   "short_name": "Arroyo POS",
   "description": "Universal Point of Sale by Reymar Arroyo",
-  "start_url": "/arroyo-pos/index.html",
+  "start_url": "/arroyo-pos/",
   "scope": "/arroyo-pos/",
   "display": "fullscreen",
+  "display_override": [
+    "fullscreen",
+    "standalone",
+    "minimal-ui"
+  ],
   "orientation": "portrait",
-  "background_color": "#1a1a18",
-  "theme_color": "#1a1a18",
+  "background_color": "#111110",
+  "theme_color": "#111110",
   "lang": "en",
-  "categories": ["business", "productivity"],
+  "categories": [
+    "business",
+    "productivity"
+  ],
   "icons": [
     {
       "src": "icon-192.png",

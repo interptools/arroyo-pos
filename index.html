@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
 <meta charset="UTF-8"/>
-<meta name="viewport" content="width=device-width,initial-scale=1.0,maximum-scale=1.0,user-scalable=no"/>
+<meta name="viewport" content="width=device-width,initial-scale=1.0,maximum-scale=1.0,user-scalable=no,viewport-fit=cover"/>
 <meta name="theme-color" content="#1a1a18"/>
 <meta name="apple-mobile-web-app-capable" content="yes"/>
 <meta name="mobile-web-app-capable" content="yes"/>
@@ -31,7 +31,7 @@ input,select,textarea{user-select:text;-webkit-user-select:text}
 }
 
 /* APP SHELL */
-#app{height:100vh;width:100vw;display:flex;flex-direction:column;overflow:hidden;position:relative;background:var(--bg0)}
+#app{height:100dvh;width:100vw;display:flex;flex-direction:column;overflow:hidden;position:relative;background:var(--bg0)}
 
 /* TOP NAV */
 .topnav{background:var(--bg1);border-bottom:1px solid var(--b1);flex-shrink:0;display:flex;flex-direction:column}
@@ -75,7 +75,7 @@ input,select,textarea{user-select:text;-webkit-user-select:text}
 .pcard.out{opacity:0.3;pointer-events:none}
 
 /* CART FAB */
-.cart-fab{position:fixed;bottom:14px;left:12px;right:12px;background:var(--ac);border-radius:16px;padding:14px 18px;display:flex;align-items:center;gap:12px;border:none;cursor:pointer;z-index:500;box-shadow:0 4px 20px rgba(0,0,0,0.4)}
+.cart-fab{position:fixed;bottom:calc(14px + env(safe-area-inset-bottom));left:12px;right:12px;background:var(--ac);border-radius:16px;padding:14px 18px;display:flex;align-items:center;gap:12px;border:none;cursor:pointer;z-index:500;box-shadow:0 4px 20px rgba(0,0,0,0.4)}
 .cart-fab:active{opacity:0.85}
 .fab-info{flex:1;text-align:left}
 .fab-count{font-size:12px;color:rgba(255,255,255,0.75);margin-bottom:2px}
@@ -99,7 +99,7 @@ input,select,textarea{user-select:text;-webkit-user-select:text}
 .qb:active{background:var(--bg3)}
 .qnum{font-size:16px;font-weight:700;min-width:24px;text-align:center}
 .ci-sub{font-size:16px;font-weight:700;color:var(--ac);min-width:70px;text-align:right;flex-shrink:0}
-.cart-foot{padding:10px 14px 14px;border-top:1px solid var(--b1);flex-shrink:0;background:var(--bg1);position:sticky;bottom:0}
+.cart-foot{padding:10px 14px calc(14px + env(safe-area-inset-bottom));border-top:1px solid var(--b1);flex-shrink:0;background:var(--bg1);position:sticky;bottom:0;z-index:10}
 .disc-row{display:flex;gap:8px;margin-bottom:8px}
 .disc-row input{flex:1;padding:9px 10px;border-radius:10px;border:1.5px solid var(--b2);background:var(--bg2);color:var(--t1);font-size:14px;outline:none}
 .disc-row select{padding:9px 8px;border-radius:10px;border:1.5px solid var(--b2);background:var(--bg2);color:var(--t1);font-size:14px;outline:none}
@@ -243,6 +243,12 @@ input,select,textarea{user-select:text;-webkit-user-select:text}
 /* TOAST */
 .toasts{position:absolute;top:10px;left:50%;transform:translateX(-50%);display:flex;flex-direction:column;gap:6px;pointer-events:none;z-index:300;width:90%;max-width:320px}
 .toast{background:var(--bg3);color:var(--t1);padding:10px 16px;border-radius:20px;font-size:13px;font-weight:600;text-align:center;border:1px solid var(--b2);box-shadow:0 4px 16px rgba(0,0,0,0.3)}
+
+/* Handle browser URL bar covering content */
+@supports (height: 100dvh) {
+  #app { height: 100dvh; }
+}
+.cart-foot, .admin-scroll { padding-bottom: max(14px, env(safe-area-inset-bottom)); }
 </style>
 </head>
 <body>
@@ -735,7 +741,9 @@ function renderAdmin(scr){
   scroll.appendChild(sec2);
 
 
-  const sec3=document.createElement('div');sec3.className='asec';
+  
+  const tx30=S.sales.filter(function(s){return new Date(s.date)>=new Date(Date.now()-30*86400000);});
+  const avg=S.sales.length?S.salesTotal/S.sales.length:0;const sec3=document.createElement('div');sec3.className='asec';
   sec3.innerHTML='<div class="asec-t">Sales summary</div><div class="stats" style="padding:0;grid-template-columns:repeat(3,1fr)"><div class="stat"><div class="stat-l">Transactions</div><div class="stat-v">'+S.sales.length+'</div></div><div class="stat"><div class="stat-l">Revenue</div><div class="stat-v" style="font-size:14px">'+fmt(S.salesTotal)+'</div></div><div class="stat"><div class="stat-l">Avg sale</div><div class="stat-v" style="font-size:14px">'+fmt(avg)+'</div></div></div><div class="stats" style="padding:8px 0 0;grid-template-columns:repeat(3,1fr)"><div class="stat"><div class="stat-l">30-day txns</div><div class="stat-v">'+tx30.length+'</div></div><div class="stat"><div class="stat-l">30-day rev.</div><div class="stat-v" style="font-size:14px">'+fmt(tx30.reduce((a,s)=>a+s.total,0))+'</div></div><div class="stat"><div class="stat-l">Products</div><div class="stat-v">'+S.prods.length+'</div></div></div>';
   const clrSalesRow=document.createElement('div');clrSalesRow.className='abtnrow';
   const clrSalesBtn=document.createElement('button');clrSalesBtn.className='abtn';clrSalesBtn.textContent='Clear sales data';
