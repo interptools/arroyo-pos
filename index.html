@@ -447,10 +447,65 @@ function renderBottomNav(app){
 function renderPOS(main){
   const cc=cartCount();
   const filtered=S.prods.filter(p=>(S.cat==='All'||p.cat===S.cat)&&(!S.search||p.name.toLowerCase().includes(S.search.toLowerCase())));
+
+  if(S.cartOpen){
+    // CART VIEW
+    const w=document.createElement('div');
+    w.className='panel';
+    w.style.cssText='flex:1;display:flex;flex-direction:column;overflow:hidden;background:var(--bg0)';
+    w.innerHTML='<div class="panel-hd">'
+      +'<button id="cartBack" style="padding:10px 16px;border-radius:10px;border:1.5px solid var(--border2);background:var(--bg2);color:var(--text1);font-size:14px;font-weight:600;cursor:pointer">Back</button>'
+      +'<h2 style="flex:1;text-align:center">Cart ('+cc+')</h2>'
+      +(cc>0?'<button id="clearCart" style="font-size:13px;color:var(--danger-text);background:none;border:none;cursor:pointer;padding:8px 10px;font-weight:600">Clear</button>':'<div style="width:60px"></div>')
+      +'</div>'
+      +'<div style="flex:1;overflow-y:auto;padding:0 14px">'
+      +(cc===0?'<div style="text-align:center;color:var(--text3);font-size:14px;padding:40px 0">Cart is empty</div>':'')
+      +S.cart.map(it=>'<div style="display:flex;align-items:center;gap:10px;padding:14px 0;border-bottom:1px solid var(--border)">'
+        +'<div style="flex:1"><div style="font-size:15px;font-weight:600">'+it.name+'</div><div style="font-size:13px;color:var(--text2);margin-top:2px">'+fmt(it.price)+' each</div></div>'
+        +'<div style="display:flex;align-items:center;gap:10px">'
+        +'<button class="qbtn" data-id="'+it.id+'" data-d="-1" style="width:36px;height:36px;border-radius:50%;border:1.5px solid var(--border2);background:var(--bg2);color:var(--text1);font-size:20px;font-weight:700;cursor:pointer;display:flex;align-items:center;justify-content:center">-</button>'
+        +'<span style="font-size:16px;font-weight:700;min-width:24px;text-align:center">'+it.qty+'</span>'
+        +'<button class="qbtn" data-id="'+it.id+'" data-d="1" style="width:36px;height:36px;border-radius:50%;border:1.5px solid var(--border2);background:var(--bg2);color:var(--text1);font-size:20px;font-weight:700;cursor:pointer;display:flex;align-items:center;justify-content:center">+</button>'
+        +'</div>'
+        +'<div style="font-size:16px;font-weight:700;color:var(--accent);min-width:70px;text-align:right">'+fmt(it.price*it.qty)+'</div>'
+        +'</div>').join('')
+      +'</div>'
+      +'<div style="padding:12px 14px;border-top:1px solid var(--border);background:var(--bg1);flex-shrink:0">'
+      +'<div style="display:flex;gap:8px;margin-bottom:10px">'
+      +'<input id="discIn" type="number" min="0" placeholder="Discount" value="'+(S.disc||'')+'" style="flex:1;padding:11px;border-radius:10px;border:1.5px solid var(--border2);background:var(--bg2);color:var(--text1);font-size:14px;outline:none"/>'
+      +'<select id="discSel" style="padding:11px 8px;border-radius:10px;border:1.5px solid var(--border2);background:var(--bg2);color:var(--text1);font-size:14px;outline:none"><option value="%"'+(S.discType==='%'?' selected':'')+'>%</option><option value="flat"'+(S.discType==='flat'?' selected':'')+'>Flat</option></select>'
+      +'</div>'
+      +'<div style="display:flex;justify-content:space-between;font-size:13px;color:var(--text2);padding:3px 0"><span>Subtotal</span><span>'+fmt(sub())+'</span></div>'
+      +(S.disc>0?'<div style="display:flex;justify-content:space-between;font-size:13px;color:var(--success-text);padding:3px 0"><span>Discount</span><span>-'+fmt(damt())+'</span></div>':'')
+      +'<div style="display:flex;justify-content:space-between;font-size:13px;color:var(--text2);padding:3px 0"><span>VAT 12%</span><span>'+fmt(tamt())+'</span></div>'
+      +'<div style="display:flex;justify-content:space-between;font-size:20px;font-weight:800;padding:10px 0 12px;border-top:1px solid var(--border);margin-top:4px"><span>Total</span><span>'+fmt(tot())+'</span></div>'
+      +'<div style="display:grid;grid-template-columns:1fr 1fr;gap:8px">'
+      +'<button id="payCash" style="padding:18px;border-radius:14px;border:1.5px solid var(--border2);background:var(--bg2);color:var(--text1);font-size:14px;font-weight:700;cursor:pointer">CASH</button>'
+      +'<button id="payCard" style="padding:18px;border-radius:14px;border:1.5px solid var(--border2);background:var(--bg2);color:var(--text1);font-size:14px;font-weight:700;cursor:pointer">CARD</button>'
+      +'<button id="payGCash" style="padding:18px;border-radius:14px;border:1.5px solid var(--border2);background:var(--bg2);color:var(--text1);font-size:14px;font-weight:700;cursor:pointer">GCASH</button>'
+      +'<button id="payTransfer" style="padding:18px;border-radius:14px;border:1.5px solid var(--border2);background:var(--bg2);color:var(--text1);font-size:14px;font-weight:700;cursor:pointer">TRANSFER</button>'
+      +'<button id="payCheckout" style="grid-column:1/-1;padding:20px;border-radius:14px;border:none;background:var(--accent);color:#fff;font-size:17px;font-weight:800;cursor:pointer">Checkout - '+fmt(tot())+'</button>'
+      +'</div></div>';
+
+    w.querySelector('#cartBack').addEventListener('click',()=>{S.cartOpen=false;render();});
+    w.querySelector('#clearCart')?.addEventListener('click',()=>{S.cart=[];S.disc=0;S.cartOpen=false;render();});
+    w.querySelectorAll('.qbtn').forEach(b=>b.addEventListener('click',()=>chgQty(+b.dataset.id,+b.dataset.d)));
+    w.querySelector('#discIn').addEventListener('input',e=>{S.disc=parseFloat(e.target.value)||0;render();});
+    w.querySelector('#discSel').addEventListener('change',e=>{S.discType=e.target.value;render();});
+    w.querySelector('#payCash').addEventListener('click',()=>{S.cashTendered=0;openModal({type:'pay',method:'Cash'});});
+    w.querySelector('#payCard').addEventListener('click',()=>{S.cashTendered=0;openModal({type:'pay',method:'Card'});});
+    w.querySelector('#payGCash').addEventListener('click',()=>{S.cashTendered=0;openModal({type:'pay',method:'GCash'});});
+    w.querySelector('#payTransfer').addEventListener('click',()=>{S.cashTendered=0;openModal({type:'pay',method:'Transfer'});});
+    w.querySelector('#payCheckout').addEventListener('click',()=>{S.cashTendered=0;openModal({type:'pay',method:'Cash'});});
+    main.appendChild(w);
+    return;
+  }
+
+  // PRODUCT GRID VIEW
   const w=document.createElement('div');w.className='pos-screen';
   w.innerHTML='<div class="pos-search"><input id="srch" placeholder="Search products..." value="'+S.search+'" /></div>'
     +'<div class="pos-cats">'+S.cats.map(c=>'<div class="cat-pill'+(S.cat===c?' on':'')+'" data-c="'+c+'">'+c+'</div>').join('')+'</div>'
-    +'<div class="prod-grid" style="padding-bottom:'+(cc>0?'90px':'12px')+'">'+filtered.map(p=>{
+    +'<div class="prod-grid" style="padding-bottom:'+(cc>0?'100px':'12px')+'">'+filtered.map(p=>{
       const out=p.stock!==999&&p.stock<=0,low=p.stock!==999&&p.stock>0&&p.stock<=5;
       return'<div class="prod-card'+(low?' lowst':'')+(out?' outst':'')+'" data-pid="'+p.id+'">'
         +'<div class="pico">'+p.icon+'</div>'
@@ -464,58 +519,10 @@ function renderPOS(main){
       +'<div class="cart-fab-btn">View cart</div>'
       +'</button>':'');
 
-  // Cart sheet
-  const overlay=document.createElement('div');overlay.className='cart-sheet-overlay'+(S.cartOpen?' open':'');
-  const sheet=document.createElement('div');sheet.className='cart-sheet'+(S.cartOpen?' open':'');
-  sheet.innerHTML='<div class="sheet-drag"></div>'
-    +'<div class="sheet-hd">'
-    +'<div class="sheet-title">Cart ('+cc+')</div>'
-    +(cc>0?'<button class="sheet-clear" id="clearCart">Clear</button>':'')
-    +'<button class="sheet-close" id="closeCart">X</button>'
-    +'</div>'
-    +'<div class="sheet-items">'
-    +(cc===0?'<div class="sheet-empty">Cart is empty</div>':'')
-    +S.cart.map(it=>'<div class="cart-item-row">'
-      +'<div class="ci-info"><div class="ci-name">'+it.name+'</div><div class="ci-price">'+fmt(it.price)+' each</div></div>'
-      +'<div class="ci-qty"><button class="qbtn" data-id="'+it.id+'" data-d="-1">-</button><span class="qnum">'+it.qty+'</span><button class="qbtn" data-id="'+it.id+'" data-d="1">+</button></div>'
-      +'<div class="ci-subtotal">'+fmt(it.price*it.qty)+'</div>'
-      +'</div>').join('')
-    +'</div>'
-    +'<div class="sheet-foot">'
-    +'<div class="disc-wrap"><input id="discIn" type="number" min="0" placeholder="Discount" value="'+(S.disc||'')+'" /><select id="discSel"><option value="%"'+(S.discType==='%'?' selected':'')+'>%</option><option value="flat"'+(S.discType==='flat'?' selected':'')+'>Flat</option></select></div>'
-    +'<div class="sum-line"><span>Subtotal</span><span>'+fmt(sub())+'</span></div>'
-    +(S.disc>0?'<div class="sum-line" style="color:var(--success-text)"><span>Discount</span><span>-'+fmt(damt())+'</span></div>':'')
-    +'<div class="sum-line"><span>VAT 12%</span><span>'+fmt(tamt())+'</span></div>'
-    +'<div class="sum-total-line"><span>Total</span><span>'+fmt(tot())+'</span></div>'
-    +'<div class="pay-row">'
-    +'<button class="pay-btn" data-pay="Cash">CASH</button>'
-    +'<button class="pay-btn" data-pay="Card">CARD</button>'
-    +'<button class="pay-btn" data-pay="GCash">GCASH</button>'
-    +'<button class="pay-btn" data-pay="Transfer">TRANSFER</button>'
-    +'<button class="pay-btn main-pay" data-pay="Cash">Checkout - '+fmt(tot())+'</button>'
-    +'</div></div>';
-
-  overlay.appendChild(sheet);
-  w.appendChild(overlay);
-
   w.querySelector('#srch').addEventListener('input',e=>{S.search=e.target.value;render();});
   w.querySelectorAll('.cat-pill').forEach(c=>c.addEventListener('click',()=>{S.cat=c.dataset.c;render();}));
   w.querySelectorAll('.prod-card[data-pid]').forEach(c=>c.addEventListener('click',()=>{const p=S.prods.find(x=>x.id===+c.dataset.pid);if(p)addToCart(p);}));
   w.querySelector('#cartFab')?.addEventListener('click',()=>{S.cartOpen=true;render();});
-  overlay.addEventListener('click',e=>{if(e.target===overlay){S.cartOpen=false;render();}});
-  sheet.querySelector('#closeCart')?.addEventListener('click',()=>{S.cartOpen=false;render();});
-  sheet.querySelector('#clearCart')?.addEventListener('click',()=>{S.cart=[];S.disc=0;S.cartOpen=false;render();});
-  sheet.querySelectorAll('.qbtn').forEach(b=>b.addEventListener('click',()=>chgQty(+b.dataset.id,+b.dataset.d)));
-  sheet.querySelector('#discIn')?.addEventListener('input',e=>{S.disc=parseFloat(e.target.value)||0;render();});
-  sheet.querySelector('#discSel')?.addEventListener('change',e=>{S.discType=e.target.value;render();});
-  sheet.addEventListener('click',e=>{
-    const pb=e.target.closest('.pay-btn[data-pay]');
-    if(pb){
-      e.stopPropagation();
-      if(!S.cart.length){toast('Cart is empty');return;}
-      S.cashTendered=0;openModal({type:'pay',method:pb.dataset.pay});
-    }
-  });
   main.appendChild(w);
 }
 
