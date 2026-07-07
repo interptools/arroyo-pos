@@ -13,7 +13,7 @@
 <title>Arroyo POS</title>
 <style>
 *{box-sizing:border-box;margin:0;padding:0;-webkit-tap-highlight-color:rgba(0,0,0,0.1)}
-html,body{height:100%;width:100%;overflow:hidden;background:#111110;color:#f0f0ec;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;position:fixed;top:0;left:0}
+html,body{height:100%;width:100%;overflow:hidden;background:var(--bg0);color:var(--t1);font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;position:fixed;top:0;left:0}
 input,select,textarea{user-select:text;-webkit-user-select:text}
 ::-webkit-scrollbar{width:3px}::-webkit-scrollbar-thumb{background:rgba(255,255,255,0.2);border-radius:3px}
 
@@ -31,7 +31,7 @@ input,select,textarea{user-select:text;-webkit-user-select:text}
 }
 
 /* APP SHELL */
-#app{height:100vh;width:100vw;display:flex;flex-direction:column;overflow:hidden;position:relative}
+#app{height:100vh;width:100vw;display:flex;flex-direction:column;overflow:hidden;position:relative;background:var(--bg0)}
 
 /* TOP NAV */
 .topnav{background:var(--bg1);border-bottom:1px solid var(--b1);flex-shrink:0;display:flex;flex-direction:column}
@@ -64,8 +64,8 @@ input,select,textarea{user-select:text;-webkit-user-select:text}
 .pos-cats::-webkit-scrollbar{height:0}
 .cat{padding:8px 16px;border-radius:20px;border:1.5px solid var(--b2);background:var(--bg2);color:var(--t2);font-size:13px;font-weight:600;cursor:pointer;white-space:nowrap;flex-shrink:0}
 .cat.on{background:var(--ac);color:#fff;border-color:var(--ac)}
-.prod-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(90px,1fr));gap:8px;padding:0 10px 100px;overflow-y:auto;flex:1}
-.pcard{background:var(--bg2);border:1.5px solid var(--b1);border-radius:14px;padding:10px;cursor:pointer;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:4px;text-align:center;aspect-ratio:1/1}
+.prod-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;padding:8px 10px 100px;overflow-y:auto;flex:1;align-content:start}
+.pcard{background:var(--bg2);border:1.5px solid var(--b1);border-radius:14px;cursor:pointer;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:4px;text-align:center;position:relative;overflow:hidden}.pcard::before{content:'';display:block;padding-top:100%}.pcard-inner{position:absolute;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:4px;padding:8px}
 .pcard:active{background:var(--bg3);transform:scale(0.94)}
 .pico{font-size:10px;font-weight:800;color:var(--t2);background:var(--bg3);padding:5px 8px;border-radius:6px;letter-spacing:0.5px}
 .pname{font-size:11px;font-weight:600;line-height:1.2}
@@ -489,7 +489,7 @@ function renderPOS(scr){
     const out=p.stock!==999&&p.stock<=0,low=p.stock!==999&&p.stock>0&&p.stock<=5;
     const card=document.createElement('div');
     card.className='pcard'+(low?' low':'')+(out?' out':'');
-    card.innerHTML='<div class="pico">'+p.icon+'</div><div class="pname">'+p.name+'</div><div class="pprice">'+fmt(p.price)+'</div><div class="pstock">'+(p.stock===999?'unlimited':out?'out of stock':low?p.stock+' left':p.stock+' in stock')+'</div>';
+    card.innerHTML='<div class="pcard-inner"><div class="pico">'+p.icon+'</div><div class="pname">'+p.name+'</div><div class="pprice">'+fmt(p.price)+'</div><div class="pstock">'+(p.stock===999?'unlimited':out?'out of stock':low?p.stock+' left':p.stock+' in stock')+'</div></div>';
     card.onclick=function(){addToCart(p);};
     grid.appendChild(card);
   });
