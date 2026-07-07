@@ -241,7 +241,7 @@ input,textarea{user-select:text;-webkit-user-select:text}
 .quick-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:8px}
 .qk-btn{padding:16px 8px;border-radius:12px;border:1.5px solid var(--border2);background:var(--bg2);color:var(--text1);font-size:15px;font-weight:700;cursor:pointer;text-align:center}
 .qk-btn:active{background:var(--bg3)}
-.qk-btn.exact{grid-column:1/-1;background:var(--accent);color:#fff;border-color:var(--accent);font-size:16px;padding:18px}
+.qk-btn.exact{background:var(--accent);color:#fff;border-color:var(--accent);font-size:15px;padding:16px;font-weight:800}
 .qk-btn.exact:active{opacity:0.85}
 .change-box{background:var(--bg0);border-radius:14px;padding:14px 16px}
 .change-row{display:flex;justify-content:space-between;font-size:14px;color:var(--text2);padding:4px 0}
@@ -751,7 +751,7 @@ function renderModal(app){
       if(chEl){chEl.textContent=change>=0?fmt(change):'--';chEl.className=change>=0?'change-pos':'change-neg';}
       if(finBtn){finBtn.style.opacity=v>=tot()?'1':'0.4';finBtn.style.pointerEvents=v>=tot()?'auto':'none';}
     });
-    ov.querySelector('#qkExact')?.addEventListener('click',()=>{S.cashTendered=Math.ceil(tot()/50)*50;openModal({type:'pay',method:'Cash'});});
+    ov.querySelectorAll('.qkset').forEach(b=>b.addEventListener('click',()=>{S.cashTendered=+b.dataset.set;openModal({type:'pay',method:'Cash'});}));
     ov.querySelectorAll('.qk-btn[data-add]').forEach(b=>b.addEventListener('click',()=>{const a=+b.dataset.add;S.cashTendered=a===0?0:(S.cashTendered||0)+a;openModal({type:'pay',method:'Cash'});}));
   }
   ov.querySelector('#mFinish')?.addEventListener('click',()=>{
