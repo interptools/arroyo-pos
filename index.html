@@ -742,7 +742,13 @@ function renderModal(app){
     ov.querySelector('#cashManual')?.addEventListener('input',e=>{
       const v=parseFloat(e.target.value)||0;
       S.cashTendered=v;
-      openModal({type:'pay',method:'Cash'});
+      const change=v-tot();
+      const tenEl=ov.querySelector('#liveTendered');
+      const chEl=ov.querySelector('#liveChange');
+      const finBtn=ov.querySelector('#mFinish');
+      if(tenEl)tenEl.textContent=fmt(v);
+      if(chEl){chEl.textContent=change>=0?fmt(change):'--';chEl.className=change>=0?'change-pos':'change-neg';}
+      if(finBtn){finBtn.style.opacity=v>=tot()?'1':'0.4';finBtn.style.pointerEvents=v>=tot()?'auto':'none';}
     });
     ov.querySelector('#qkExact')?.addEventListener('click',()=>{S.cashTendered=Math.ceil(tot()/50)*50;openModal({type:'pay',method:'Cash'});});
     ov.querySelectorAll('.qk-btn[data-add]').forEach(b=>b.addEventListener('click',()=>{const a=+b.dataset.add;S.cashTendered=a===0?0:(S.cashTendered||0)+a;openModal({type:'pay',method:'Cash'});}));
