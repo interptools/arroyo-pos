@@ -7,10 +7,13 @@
 <meta name="apple-mobile-web-app-capable" content="yes" />
 <meta name="apple-mobile-web-app-status-bar-style" content="default" />
 <meta name="apple-mobile-web-app-title" content="Arroyo POS" />
+<meta name="mobile-web-app-capable" content="yes" />
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+<meta name="screen-orientation" content="portrait" />
 <meta name="description" content="Universal Point of Sale by Reymar Arroyo" />
 <title>Arroyo POS</title>
 <link rel="manifest" href="manifest.json" />
-<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@tabler/icons-webfont@3.19.0/dist/tabler-icons.min.css" crossorigin="anonymous" />
+
 <style>
   :root {
     --surface-0: #f4f4f2;
@@ -65,7 +68,10 @@
     }
   }
   * { box-sizing: border-box; margin: 0; padding: 0; -webkit-tap-highlight-color: transparent; }
-  html, body { height: 100%; overflow: hidden; }
+  html, body { height: 100%; width: 100%; overflow: hidden; margin: 0; padding: 0; position: fixed; top: 0; left: 0; }
+  * { -webkit-tap-highlight-color: transparent; -webkit-touch-callout: none; user-select: none; }
+  input, textarea { user-select: text; -webkit-user-select: text; }
+  #app { min-height: 100vh; }
   body { font-family: var(--font-sans); color: var(--text-primary); background: var(--surface-0); }
   #app { height: 100vh; display: flex; flex-direction: column; position: relative; overflow: hidden; }
 
@@ -296,18 +302,84 @@
     #print-area .pr-store { font-size: 18px; font-weight: 900; text-align: center; margin-bottom: 4px; }
   }
 </style>
+
+<style id="icon-overrides">
+/* Fallback icon system - simple unicode symbols */
+.ti { font-style: normal; font-family: sans-serif; display: inline-block; line-height: 1; font-size: 10px; font-weight: 600; letter-spacing: 0; }
+.ti::before { content: ''; }
+.ti-shopping-bag::before { content: 'BAG'; }
+.ti-clipboard-list::before { content: 'LIST'; }
+.ti-history::before { content: 'HIST'; }
+.ti-lock::before { content: 'LOCK'; }
+.ti-info-circle::before { content: 'INFO'; }
+.ti-search::before { content: 'SRCH'; }
+.ti-shopping-cart::before { content: 'CART'; }
+.ti-shopping-cart-off::before { content: 'CART'; }
+.ti-cash::before { content: 'CASH'; }
+.ti-credit-card::before { content: 'CARD'; }
+.ti-device-mobile::before { content: 'MOB'; }
+.ti-building-bank::before { content: 'BANK'; }
+.ti-receipt::before { content: 'RCPT'; }
+.ti-plus::before { content: '+'; }
+.ti-edit::before { content: 'EDIT'; }
+.ti-trash::before { content: 'DEL'; }
+.ti-check::before { content: '\2713'; }
+.ti-x::before { content: '\2715'; }
+.ti-tools-kitchen-2::before { content: 'FOOD'; }
+.ti-coffee::before { content: 'CAFE'; }
+.ti-shirt::before { content: 'SHRT'; }
+.ti-scissors::before { content: 'SCSR'; }
+.ti-pill::before { content: 'PILL'; }
+.ti-shopping-cart::before { content: 'CART'; }
+.ti-device-laptop::before { content: 'ELEC'; }
+.ti-building-store::before { content: 'STOR'; }
+.ti-flame::before { content: 'FRYS'; }
+.ti-glass::before { content: 'DRNK'; }
+.ti-bowl::before { content: 'BOWL'; }
+.ti-bread::before { content: 'BROD'; }
+.ti-cake::before { content: 'CAKE'; }
+.ti-hanger::before { content: 'JKTS'; }
+.ti-hat::before { content: 'CAPS'; }
+.ti-backpack::before { content: 'BAGS'; }
+.ti-paint::before { content: 'HAIR'; }
+.ti-hand-finger::before { content: 'NAIL'; }
+.ti-sparkles::before { content: 'FACE'; }
+.ti-egg::before { content: 'EGGS'; }
+.ti-bottle::before { content: 'MILK'; }
+.ti-plug::before { content: 'PLUG'; }
+.ti-headphones::before { content: 'HDPH'; }
+.ti-battery-charging::before { content: 'BATR'; }
+.ti-first-aid-kit::before { content: 'MEDS'; }
+.ti-temperature::before { content: 'TEMP'; }
+.ti-tag::before { content: 'TAGS'; }
+.ti-box::before { content: 'ITEM'; }
+.ti-package::before { content: 'ITEM'; }
+.ti-grain::before { content: 'RICE'; }
+.ti-code::before { content: 'CODE'; }
+.ti-phone::before { content: 'PHON'; }
+.ti-mail::before { content: 'MAIL'; }
+.ti-shield-lock::before { content: 'LOCK'; }
+.ti-shield-check::before { content: 'SHLD'; }
+.ti-printer::before { content: 'PRNT'; }
+.ti-refresh::before { content: '\21BA'; }
+.ti-arrow-left::before { content: '\2190'; }
+.ti-fish::before { content: 'FISH'; }
+.ti-meat::before { content: 'MEAT'; }
+.ti-salad::before { content: 'SALD'; }
+.ti-soup::before { content: 'SOUP'; }
+</style>
 </head>
 <body>
 <div id="app"><div class="toast-wrap" id="toasts"></div></div>
 <div id="print-area"></div>
 
 <script>
-const CUR = '₱', TAX = 0.12;
+const CUR = '\u20B1', TAX = 0.12;
 const CREATOR_PASS = 'ReeseK28@@@';
 const CREATOR = { name: 'Reymar Arroyo', phone: '+639063964052', email: 'areymar36@gmail.com', product: 'Arroyo POS', version: '1.0' };
 const BT = [
   { id: 'food', label: 'Food & dining', icon: 'ti-tools-kitchen-2' },
-  { id: 'cafe', label: 'Café', icon: 'ti-coffee' },
+  { id: 'cafe', label: 'Cafe', icon: 'ti-coffee' },
   { id: 'retail', label: 'Retail', icon: 'ti-shirt' },
   { id: 'salon', label: 'Salon & spa', icon: 'ti-scissors' },
   { id: 'pharmacy', label: 'Pharmacy', icon: 'ti-pill' },
@@ -372,7 +444,7 @@ function receiptStr(method, id) {
   const now = new Date(); const w = 32;
   const lp = (s, n) => (s+'').length >= n ? (s+'').slice(0,n) : s + ' '.repeat(n - (s+'').length);
   const rp = (s, n) => (s+'').length >= n ? (s+'').slice(0,n) : ' '.repeat(n - (s+'').length) + s;
-  const line = '─'.repeat(w);
+  const line = '-'.repeat(w);
   const rows = [lp(S.bizName, w), line, 'Date: ' + now.toLocaleString(), 'TXN:  ' + id, line];
   S.cart.forEach(i => { const r = fmt(i.price * i.qty); rows.push(lp(i.name + ' x' + i.qty, w - r.length) + r); });
   rows.push(line);
@@ -420,7 +492,7 @@ function renderBiz(app) {
       <div class="biz-sub">Set up your business</div>
     </div>
     <div class="biz-grid">${BT.map(b => `<div class="biz-card" data-b="${b.id}"><i class="ti ${b.icon}" aria-hidden="true"></i><span>${b.label}</span></div>`).join('')}</div>
-    <p class="biz-note">Choose once — this becomes your permanent POS profile on this device. Cannot be changed without admin access.</p>
+    <p class="biz-note">Choose once - this becomes your permanent POS profile on this device. Cannot be changed without admin access.</p>
     <div class="biz-footer"><i class="ti ti-code" style="font-size:13px" aria-hidden="true"></i><span>Built by <strong>${CREATOR.name}</strong> · ${CREATOR.email}</span></div>`;
   d.querySelectorAll('.biz-card').forEach(c => c.addEventListener('click', () => {
     if (confirm('Set up as "' + BT.find(x => x.id === c.dataset.b).label + '"?\n\nThis cannot be changed without admin access.')) initBiz(c.dataset.b);
@@ -448,7 +520,7 @@ function renderPOS(body) {
   const cc = S.cart.reduce((s, i) => s + i.qty, 0);
   const w = document.createElement('div'); w.className = 'pos-wrap';
   w.innerHTML = `<div class="pos-left">
-    <div class="swrap"><i class="ti ti-search" aria-hidden="true"></i><input id="srch" placeholder="Search products…" value="${S.search}" /></div>
+    <div class="swrap"><i class="ti ti-search" aria-hidden="true"></i><input id="srch" placeholder="Search products..." value="${S.search}" /></div>
     <div class="cats">${S.cats.map(c => `<div class="cpill${S.cat===c?' on':''}" data-c="${c}">${c}</div>`).join('')}</div>
     <div class="pgrid">${filtered.map(p => { const out=p.stock!==999&&p.stock<=0,low=p.stock!==999&&p.stock>0&&p.stock<=5; return `<div class="pcard${low?' lowst':''}${out?' outst':''}" data-pid="${p.id}"><i class="ti ${p.icon}" aria-hidden="true"></i><div class="pn">${p.name}</div><div class="pp">${fmt(p.price)}</div><div class="ps">${p.stock===999?'unlimited':out?'out of stock':low?p.stock+' left':p.stock+' in stock'}</div></div>`; }).join('')}</div>
   </div>
@@ -459,12 +531,12 @@ function renderPOS(body) {
     </div>
     <div class="cart-body">
       ${!S.cart.length ? `<div class="cempty"><i class="ti ti-shopping-cart-off" aria-hidden="true"></i><span>Cart is empty</span></div>` : ''}
-      ${S.cart.map(it => `<div class="citem"><div class="cin"><div class="cn">${it.name}</div><div class="cs">${fmt(it.price)} each</div></div><div class="qw"><button class="qb" data-id="${it.id}" data-d="-1">−</button><span class="qn">${it.qty}</span><button class="qb" data-id="${it.id}" data-d="1">+</button></div><div class="ct">${fmt(it.price*it.qty)}</div></div>`).join('')}
+      ${S.cart.map(it => `<div class="citem"><div class="cin"><div class="cn">${it.name}</div><div class="cs">${fmt(it.price)} each</div></div><div class="qw"><button class="qb" data-id="${it.id}" data-d="-1">-</button><span class="qn">${it.qty}</span><button class="qb" data-id="${it.id}" data-d="1">+</button></div><div class="ct">${fmt(it.price*it.qty)}</div></div>`).join('')}
     </div>
     <div class="cart-ft">
       <div class="drow"><input id="discIn" type="number" min="0" placeholder="Discount" value="${S.disc||''}" /><select id="discTypeSel"><option value="%"${S.discType==='%'?' selected':''}>%</option><option value="flat"${S.discType==='flat'?' selected':''}>Flat</option></select></div>
       <div class="srow2"><span>Subtotal</span><span>${fmt(sub())}</span></div>
-      ${S.disc>0?`<div class="srow2" style="color:var(--text-success)"><span>Discount</span><span>−${fmt(damt())}</span></div>`:''}
+      ${S.disc>0?`<div class="srow2" style="color:var(--text-success)"><span>Discount</span><span>-${fmt(damt())}</span></div>`:''}
       <div class="srow2"><span>VAT 12%</span><span>${fmt(tamt())}</span></div>
       <div class="stotal"><span>Total</span><span>${fmt(tot())}</span></div>
       <div class="pgrid2">
@@ -493,7 +565,7 @@ function renderInv(body) {
   const outCnt = S.prods.filter(p => p.stock!==999&&p.stock<=0).length;
   wrap.innerHTML = `<div class="subhd"><div><h2>Inventory</h2><div class="stat-row" style="margin-top:8px;max-width:320px"><div class="stat"><div class="sl">Items</div><div class="sv">${S.prods.length}</div></div><div class="stat"><div class="sl" style="color:var(--text-warning)">Low stock</div><div class="sv" style="color:var(--text-warning)">${lowCnt}</div></div><div class="stat"><div class="sl" style="color:var(--text-danger)">Out</div><div class="sv" style="color:var(--text-danger)">${outCnt}</div></div></div></div><button class="addbtn" id="addPr"><i class="ti ti-plus" aria-hidden="true"></i>Add product</button></div>
   <div class="inv-wrap"><table class="inv-tbl"><thead><tr><th style="width:28px"></th><th>Product</th><th style="width:90px">Category</th><th style="width:70px">Price</th><th style="width:75px">Stock</th><th style="width:58px"></th></tr></thead>
-  <tbody>${S.prods.map(p => { const out=p.stock!==999&&p.stock<=0,low=p.stock!==999&&p.stock>0&&p.stock<=5; return `<tr><td><i class="ti ${p.icon}" style="font-size:16px;color:var(--text-secondary)" aria-hidden="true"></i></td><td style="font-weight:500">${p.name}</td><td style="color:var(--text-secondary)">${p.cat}</td><td>${fmt(p.price)}</td><td><span class="sbadge ${out?'sout':low?'slow':'sok'}">${p.stock===999?'∞':out?'out':low?p.stock+' low':p.stock}</span></td><td><div class="ract"><button class="rbtn epr" data-pid="${p.id}" title="Edit"><i class="ti ti-edit" aria-hidden="true"></i></button><button class="rbtn del dpr" data-pid="${p.id}" title="Delete"><i class="ti ti-trash" aria-hidden="true"></i></button></div></td></tr>`; }).join('')}</tbody></table></div>`;
+  <tbody>${S.prods.map(p => { const out=p.stock!==999&&p.stock<=0,low=p.stock!==999&&p.stock>0&&p.stock<=5; return `<tr><td><i class="ti ${p.icon}" style="font-size:16px;color:var(--text-secondary)" aria-hidden="true"></i></td><td style="font-weight:500">${p.name}</td><td style="color:var(--text-secondary)">${p.cat}</td><td>${fmt(p.price)}</td><td><span class="sbadge ${out?'sout':low?'slow':'sok'}">${p.stock===999?'inf':out?'out':low?p.stock+' low':p.stock}</span></td><td><div class="ract"><button class="rbtn epr" data-pid="${p.id}" title="Edit"><i class="ti ti-edit" aria-hidden="true"></i></button><button class="rbtn del dpr" data-pid="${p.id}" title="Delete"><i class="ti ti-trash" aria-hidden="true"></i></button></div></td></tr>`; }).join('')}</tbody></table></div>`;
   wrap.querySelector('#addPr').addEventListener('click', () => openModal({ type:'prod', prod:null }));
   wrap.querySelectorAll('.epr').forEach(b => b.addEventListener('click', () => { const p = S.prods.find(x => x.id === +b.dataset.pid); if (p) openModal({ type:'prod', prod:{...p} }); }));
   wrap.querySelectorAll('.dpr').forEach(b => b.addEventListener('click', () => openModal({ type:'confirm', pid:+b.dataset.pid })));
@@ -513,10 +585,10 @@ function renderHist(body) {
   const totalAmt = filt.reduce((a, s) => a + s.total, 0);
   wrap.innerHTML = `<div class="subhd"><h2>Transaction history</h2><div style="text-align:right;flex-shrink:0"><div style="font-size:14px;font-weight:600">${fmt(totalAmt)}</div><div style="font-size:10px;color:var(--text-muted)">${filt.length} transactions</div></div></div>
   <div class="hist-filters">
-    <div class="swrap" style="flex:1;min-width:120px"><i class="ti ti-search" aria-hidden="true"></i><input id="hsrch" placeholder="Search…" value="${S.histSearch}" style="width:100%;padding:6px 8px 6px 28px;border-radius:var(--radius);border:0.5px solid var(--border-strong);background:var(--surface-1);color:var(--text-primary);font-size:12px;outline:none" /></div>
+    <div class="swrap" style="flex:1;min-width:120px"><i class="ti ti-search" aria-hidden="true"></i><input id="hsrch" placeholder="Search..." value="${S.histSearch}" style="width:100%;padding:6px 8px 6px 28px;border-radius:var(--radius);border:0.5px solid var(--border-strong);background:var(--surface-1);color:var(--text-primary);font-size:12px;outline:none" /></div>
     ${['all','today','week','month'].map(f => `<div class="hfpill${S.histFilter===f?' on':''}" data-f="${f}">${f==='all'?'All time':f==='today'?'Today':f==='week'?'This week':'This month'}</div>`).join('')}
   </div>
-  <div class="hist-wrap">${Object.keys(byDay).length===0?`<div class="empty-hist">No transactions found.</div>`:''}${Object.entries(byDay).map(([ds,txs])=>{ const dayTot=txs.reduce((a,s)=>a+s.total,0); const today=new Date().toDateString(),yest=new Date(Date.now()-86400000).toDateString(); const label=ds===today?'Today':ds===yest?'Yesterday':new Date(ds).toLocaleDateString('en-PH',{weekday:'short',month:'short',day:'numeric'}); return `<div class="day-group"><div class="day-label">${label}</div><div class="day-sum">${txs.length} transaction${txs.length!==1?'s':''} · ${fmt(dayTot)}</div>${txs.map(s=>`<div class="txcard" data-txid="${s.id}"><div class="txleft"><div class="txid">${s.id}</div><div class="txitems">${s.items.map(i=>i.name+' ×'+i.qty).join(', ')}</div><div class="txtime">${new Date(s.date).toLocaleTimeString([],{hour:'2-digit',minute:'2-digit'})}</div></div><div class="txright"><div class="txtotal">${fmt(s.total)}</div><div class="txmethod ${s.method}">${s.method}</div></div></div>`).join('')}</div>`; }).join('')}</div>`;
+  <div class="hist-wrap">${Object.keys(byDay).length===0?`<div class="empty-hist">No transactions found.</div>`:''}${Object.entries(byDay).map(([ds,txs])=>{ const dayTot=txs.reduce((a,s)=>a+s.total,0); const today=new Date().toDateString(),yest=new Date(Date.now()-86400000).toDateString(); const label=ds===today?'Today':ds===yest?'Yesterday':new Date(ds).toLocaleDateString('en-PH',{weekday:'short',month:'short',day:'numeric'}); return `<div class="day-group"><div class="day-label">${label}</div><div class="day-sum">${txs.length} transaction${txs.length!==1?'s':''} · ${fmt(dayTot)}</div>${txs.map(s=>`<div class="txcard" data-txid="${s.id}"><div class="txleft"><div class="txid">${s.id}</div><div class="txitems">${s.items.map(i=>i.name+' x'+i.qty).join(', ')}</div><div class="txtime">${new Date(s.date).toLocaleTimeString([],{hour:'2-digit',minute:'2-digit'})}</div></div><div class="txright"><div class="txtotal">${fmt(s.total)}</div><div class="txmethod ${s.method}">${s.method}</div></div></div>`).join('')}</div>`; }).join('')}</div>`;
   wrap.querySelector('#hsrch').addEventListener('input', e => { S.histSearch = e.target.value; render(); });
   wrap.querySelectorAll('.hfpill').forEach(p => p.addEventListener('click', () => { S.histFilter = p.dataset.f; render(); }));
   wrap.querySelectorAll('.txcard').forEach(c => c.addEventListener('click', () => { const tx = S.sales.find(s => s.id === c.dataset.txid); if (tx) openModal({ type:'viewtx', tx }); }));
@@ -528,7 +600,7 @@ function renderAbout(body) {
   wrap.innerHTML = `
   <div class="about-pos-card">
     <div class="pos-logo">${CREATOR.product}</div>
-    <div class="pos-tagline">Universal Point of Sale — for any business</div>
+    <div class="pos-tagline">Universal Point of Sale - for any business</div>
     <div class="pos-version">Version ${CREATOR.version}</div>
     <div class="feature-list">
       <div class="feature-row"><i class="ti ti-check" aria-hidden="true"></i>Multi-business support with permanent device setup</div>
@@ -537,7 +609,7 @@ function renderAbout(body) {
       <div class="feature-row"><i class="ti ti-check" aria-hidden="true"></i>VAT 12% and discount (% or flat) support</div>
       <div class="feature-row"><i class="ti ti-check" aria-hidden="true"></i>Full transaction history with printable receipts</div>
       <div class="feature-row"><i class="ti ti-check" aria-hidden="true"></i>Password-protected admin panel</div>
-      <div class="feature-row"><i class="ti ti-check" aria-hidden="true"></i>Works offline — no internet needed after install</div>
+      <div class="feature-row"><i class="ti ti-check" aria-hidden="true"></i>Works offline - no internet needed after install</div>
       <div class="feature-row"><i class="ti ti-check" aria-hidden="true"></i>Dark mode support</div>
     </div>
   </div>
@@ -556,7 +628,7 @@ function renderAbout(body) {
 
 function renderLock(body) {
   const w = document.createElement('div'); w.className = 'lock-screen';
-  w.innerHTML = `<div class="lock-card"><i class="ti ti-lock lock-icon" aria-hidden="true"></i><h2>Admin access</h2><p>Enter your password to continue.</p><input type="password" id="lpin" placeholder="••••" maxlength="30" /><span class="lerr" id="lerr"></span><button class="unlock-btn" id="ulbtn">Unlock</button></div>`;
+  w.innerHTML = `<div class="lock-card"><i class="ti ti-lock lock-icon" aria-hidden="true"></i><h2>Admin access</h2><p>Enter your password to continue.</p><input type="password" id="lpin" placeholder="****" maxlength="30" /><span class="lerr" id="lerr"></span><button class="unlock-btn" id="ulbtn">Unlock</button></div>`;
   const tryUnlock = () => { if (w.querySelector('#lpin').value === S.pass) { S.locked = false; render(); } else { w.querySelector('#lerr').textContent = 'Incorrect password.'; w.querySelector('#lpin').value = ''; w.querySelector('#lpin').focus(); } };
   w.querySelector('#ulbtn').addEventListener('click', tryUnlock);
   w.querySelector('#lpin').addEventListener('keydown', e => { if (e.key === 'Enter') tryUnlock(); });
@@ -616,13 +688,13 @@ function renderModal(body) {
     html = `<div class="modal"><div style="font-size:10px;padding:2px 8px;border-radius:20px;background:#eeedfe;color:#534ab7;font-weight:500;display:inline-block;margin-bottom:4px"><i class="ti ti-shield-check" style="font-size:11px;vertical-align:-1px;margin-right:3px" aria-hidden="true"></i>Creator access granted</div><h2>Change business type</h2><p style="font-size:12px;color:var(--text-danger);line-height:1.6">Changing will reset all products to the new type's defaults. Sales history is preserved.</p><div class="mf"><label>Select new business type</label><select id="nbizSel">${BT.map(b=>`<option value="${b.id}"${b.id===S.biz?' selected':''}>${b.label}</option>`).join('')}</select></div><div class="mbtns"><button id="mClose">Cancel</button><button class="mpri" style="background:#534ab7;border-color:#534ab7" id="confirmBizChange">Change</button></div></div>`;
   } else if (m.type === 'pay') {
     const id = txId();
-    html = `<div class="modal"><h2><i class="ti ti-receipt" style="font-size:14px;vertical-align:-2px;margin-right:6px" aria-hidden="true"></i>Receipt — ${m.method}</h2><div class="rbox" id="rcptTxt">${receiptStr(m.method, id)}</div><div class="mbtns"><button id="mPrint"><i class="ti ti-printer" style="font-size:13px;vertical-align:-1px;margin-right:3px" aria-hidden="true"></i>Print</button><button id="mClose">Close</button><button class="mpri" id="mFinish"><i class="ti ti-check" style="font-size:13px;vertical-align:-1px;margin-right:3px" aria-hidden="true"></i>Confirm sale</button></div></div>`;
+    html = `<div class="modal"><h2><i class="ti ti-receipt" style="font-size:14px;vertical-align:-2px;margin-right:6px" aria-hidden="true"></i>Receipt - ${m.method}</h2><div class="rbox" id="rcptTxt">${receiptStr(m.method, id)}</div><div class="mbtns"><button id="mPrint"><i class="ti ti-printer" style="font-size:13px;vertical-align:-1px;margin-right:3px" aria-hidden="true"></i>Print</button><button id="mClose">Close</button><button class="mpri" id="mFinish"><i class="ti ti-check" style="font-size:13px;vertical-align:-1px;margin-right:3px" aria-hidden="true"></i>Confirm sale</button></div></div>`;
   } else if (m.type === 'viewtx') {
     html = `<div class="modal"><h2><i class="ti ti-receipt" style="font-size:14px;vertical-align:-2px;margin-right:6px" aria-hidden="true"></i>${m.tx.id}</h2><div class="rbox">${m.tx.receipt}</div><div class="mbtns"><button id="mPrintOld"><i class="ti ti-printer" style="font-size:13px;vertical-align:-1px;margin-right:3px" aria-hidden="true"></i>Print</button><button id="mClose">Close</button></div></div>`;
   } else if (m.type === 'prod') {
     const p=m.prod; const isNew=!p; const pp=p||{name:'',price:'',cat:'',icon:'ti-package',stock:''};
     const cats=[...new Set(S.prods.map(x=>x.cat))];
-    html = `<div class="modal"><h2>${isNew?'Add product':'Edit product'}</h2><div class="mf"><label>Product name</label><input id="pNm" value="${pp.name}" placeholder="e.g. Espresso" /></div><div style="display:grid;grid-template-columns:1fr 1fr;gap:10px"><div class="mf"><label>Price (${CUR})</label><input id="pPr" type="number" value="${pp.price}" min="0" step="0.01" /></div><div class="mf"><label>Stock (blank = ∞)</label><input id="pSt" type="number" value="${pp.stock===999?'':pp.stock}" min="0" /></div></div><div class="mf"><label>Category</label><input id="pCt" value="${pp.cat}" placeholder="e.g. Drinks" list="catdl" /><datalist id="catdl">${cats.map(c=>`<option value="${c}">`).join('')}</datalist></div><div class="mf"><label>Icon</label><select id="pIc">${ICONS.map(ic=>`<option value="${ic}"${ic===pp.icon?' selected':''}>${ic.replace('ti-','')}</option>`).join('')}</select></div><div class="mbtns">${!isNew?`<button class="mdel" id="mDelPr">Delete</button>`:''}<button id="mClose">Cancel</button><button class="mpri" id="mSavePr">Save</button></div></div>`;
+    html = `<div class="modal"><h2>${isNew?'Add product':'Edit product'}</h2><div class="mf"><label>Product name</label><input id="pNm" value="${pp.name}" placeholder="e.g. Espresso" /></div><div style="display:grid;grid-template-columns:1fr 1fr;gap:10px"><div class="mf"><label>Price (${CUR})</label><input id="pPr" type="number" value="${pp.price}" min="0" step="0.01" /></div><div class="mf"><label>Stock (blank = inf)</label><input id="pSt" type="number" value="${pp.stock===999?'':pp.stock}" min="0" /></div></div><div class="mf"><label>Category</label><input id="pCt" value="${pp.cat}" placeholder="e.g. Drinks" list="catdl" /><datalist id="catdl">${cats.map(c=>`<option value="${c}">`).join('')}</datalist></div><div class="mf"><label>Icon</label><select id="pIc">${ICONS.map(ic=>`<option value="${ic}"${ic===pp.icon?' selected':''}>${ic.replace('ti-','')}</option>`).join('')}</select></div><div class="mbtns">${!isNew?`<button class="mdel" id="mDelPr">Delete</button>`:''}<button id="mClose">Cancel</button><button class="mpri" id="mSavePr">Save</button></div></div>`;
   } else if (m.type === 'confirm') {
     const p = S.prods.find(x => x.id === m.pid);
     html = `<div class="modal"><h2>Delete product</h2><p style="font-size:13px;color:var(--text-secondary);line-height:1.6">Remove "${p?.name}" from inventory? This cannot be undone.</p><div class="mbtns"><button id="mClose">Cancel</button><button class="mpri" style="background:var(--fill-danger);border-color:var(--fill-danger)" id="mConfDel">Delete</button></div></div>`;
@@ -651,7 +723,7 @@ function renderModal(body) {
     const tx = { id, date:new Date().toISOString(), items:S.cart.map(i=>({name:i.name,qty:i.qty,price:i.price})), total:tot(), method:m.method, receipt:receiptStr(m.method,id) };
     S.cart.forEach(ci => { const p=S.prods.find(x=>x.id===ci.id); if(p&&p.stock!==999) p.stock=Math.max(0,p.stock-ci.qty); });
     S.sales.push(tx); S.salesTotal += tot(); S.cart=[]; S.disc=0;
-    save(); closeModal(); toast('Sale recorded — ' + id);
+    save(); closeModal(); toast('Sale recorded - ' + id);
   });
   ov.querySelector('#mSavePr')?.addEventListener('click', () => {
     const name=ov.querySelector('#pNm').value.trim(), price=parseFloat(ov.querySelector('#pPr').value)||0;
@@ -669,7 +741,7 @@ function renderModal(body) {
   body.appendChild(ov);
 }
 
-try { load(); render(); } catch(e) { document.getElementById('app').innerHTML = '<div style="padding:40px;text-align:center;font-family:sans-serif"><h2>Arroyo POS</h2><p style="color:#666;margin-top:8px">Loading...</p><p style="color:#999;font-size:12px;margin-top:16px">Error: '+e.message+'</p></div>'; console.error(e); }
+load(); render();
 
 // Register service worker for PWA/offline support
 if ('serviceWorker' in navigator) {
@@ -678,6 +750,6 @@ if ('serviceWorker' in navigator) {
   });
 }
 
-
+</script>
 </body>
 </html>

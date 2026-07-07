@@ -4,11 +4,12 @@
   "description": "Universal Point of Sale by Reymar Arroyo",
   "start_url": "/arroyo-pos/index.html",
   "scope": "/arroyo-pos/",
-  "display": "standalone",
+  "display": "fullscreen",
   "orientation": "portrait",
-  "background_color": "#ffffff",
+  "background_color": "#1a1a18",
   "theme_color": "#1a1a18",
   "lang": "en",
+  "categories": ["business", "productivity"],
   "icons": [
     {
       "src": "icon-192.png",
