@@ -1069,9 +1069,7 @@ function renderModal(app){
     const del=document.createElement('button');del.className='mpri';del.style.background='var(--df)';del.textContent='Delete';
     del.onclick=function(){S.prods=S.prods.filter(x=>x.id!==m.pid);S.cart=S.cart.filter(x=>x.id!==m.pid);const cs=[...new Set(S.prods.map(x=>x.cat))];S.cats=['All',...cs];save();closeModal();toast('Deleted');};
     btns.appendChild(cancel);btns.appendChild(del);body.appendChild(btns);
-  }
-
-  else if(m.type==='dailyReport'){
+  } else if(m.type==='dailyReport'){
     const date=m.date;const range=m.range;const label=m.label||date;
     // Filter sales
     let filtered=S.sales.filter(function(s){
