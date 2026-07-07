@@ -284,7 +284,7 @@ let S={
   cart:[],cat:'All',search:'',disc:0,discType:'%',
   pass:'1234',locked:true,nid:10,sales:[],salesTotal:0,
   modal:null,histFilter:'all',cashTendered:0,
-  themeColor:'#111110',cartOpen:false
+  themeColor:'#111110',cartOpen:false,requireRef:false
 };
 
 function load(){
@@ -298,6 +298,7 @@ function load(){
       });
     }
     if(d.themeColor){S.themeColor=d.themeColor;applyTheme(d.themeColor);}
+    if(d.requireRef!==undefined)S.requireRef=d.requireRef;
   }catch(e){}
 }
 
@@ -306,7 +307,7 @@ function save(){
     localStorage.setItem('arroyo_pos',JSON.stringify({
       biz:S.biz,bizName:S.bizName,prods:S.prods,cats:S.cats,
       pass:S.pass,nid:S.nid,sales:S.sales,salesTotal:S.salesTotal,
-      themeColor:S.themeColor
+      themeColor:S.themeColor,requireRef:S.requireRef
     }));
   }catch(e){}
 }
@@ -343,7 +344,7 @@ function toast(msg){
 
 function sub(){return S.cart.reduce((s,i)=>s+i.price*i.qty,0);}
 function damt(){const s=sub();return S.discType==='%'?s*Math.min(S.disc,100)/100:Math.min(S.disc,s);}
-function tamt(){return(sub()-damt())*TAX;}
+function tamt(){return 0;}
 function tot(){return sub()-damt()+tamt();}
 function txId(){return'TXN-'+String(S.sales.length+1).padStart(5,'0');}
 function cc(){return S.cart.reduce((s,i)=>s+i.qty,0);}
@@ -371,7 +372,7 @@ function chgQty(id,delta){
   render();
 }
 
-function receiptStr(method,id){
+function receiptStr(method,id,refNum){
   const now=new Date(),w=28;
   const lp=(s,n)=>String(s).length>=n?String(s).slice(0,n):String(s)+' '.repeat(n-String(s).length);
   const rp=(s,n)=>String(s).length>=n?String(s).slice(0,n):' '.repeat(n-String(s).length)+String(s);
@@ -382,10 +383,11 @@ function receiptStr(method,id){
   const ar=(l,r)=>rows.push(lp(l,w-r.length)+r);
   ar('Subtotal:',fmt(sub()));
   if(S.disc>0)ar('Discount:','-'+fmt(damt()));
-  ar('VAT 12%:',fmt(tamt()));
+  // VAT already included in price - no separate VAT line
   rows.push(line);
   ar('TOTAL:',fmt(tot()));
   rows.push('Payment: '+method);
+  if(refNum)rows.push('Ref No:  '+refNum);
   if(method==='Cash'&&S.cashTendered>=tot()){
     ar('Cash:',fmt(S.cashTendered));
     ar('Change:',fmt(S.cashTendered-tot()));
@@ -556,6 +558,7 @@ function renderCart(scr){
     ['VAT 12%',fmt(tamt())]
   ];
   rows.forEach(([l,v])=>{
+    if(l==='VAT 12%') return;
     const r=document.createElement('div');r.className='sum';
     r.innerHTML='<span>'+l+'</span><span>'+(l==='Discount'?'<span style="color:var(--st)">'+v+'</span>':v)+'</span>';
     foot.appendChild(r);
@@ -569,7 +572,6 @@ function renderCart(scr){
     {id:'Cash',lbl:'CASH'},
     {id:'Card',lbl:'CARD'},
     {id:'GCash',lbl:'GCASH'},
-    {id:'Transfer',lbl:'TRANSFER'},
   ].forEach(pm=>{
     const btn=document.createElement('button');btn.className='pbtn';btn.textContent=pm.lbl;
     btn.onclick=function(){S.cashTendered=0;openModal({type:'pay',method:pm.id});};
@@ -695,6 +697,18 @@ function renderAdmin(scr){
   const s1btn=document.createElement('div');s1btn.className='abtnrow';
   const saveShopBtn=document.createElement('button');saveShopBtn.className='abtn pri';saveShopBtn.textContent='Save';
   saveShopBtn.onclick=function(){S.bizName=document.getElementById('aName').value||S.bizName;save();render();toast('Saved!');};
+    // Reference number toggle
+  const refToggleRow=document.createElement('div');
+  refToggleRow.style.cssText='display:flex;align-items:center;justify-content:space-between;gap:12px;padding:10px 0;border-top:1px solid var(--b1);margin-top:4px';
+  refToggleRow.innerHTML='<div><div style="font-size:14px;font-weight:600">Require reference number</div><div style="font-size:12px;color:var(--t3);margin-top:2px">Card & GCash must enter ref/transaction number</div></div>';
+  const tog=document.createElement('div');
+  tog.style.cssText='width:52px;height:28px;border-radius:20px;cursor:pointer;flex-shrink:0;position:relative;background:'+(S.requireRef?'var(--ac)':'var(--bg3)');
+  const knb=document.createElement('div');
+  knb.style.cssText='width:22px;height:22px;border-radius:50%;background:#fff;position:absolute;top:3px;transition:all 0.2s;'+(S.requireRef?'right:3px':'left:3px');
+  tog.appendChild(knb);
+  tog.onclick=function(){S.requireRef=!S.requireRef;save();render();toast('Reference '+(S.requireRef?'required':'optional'));};
+  refToggleRow.appendChild(tog);sec1.appendChild(refToggleRow);
+
   s1btn.appendChild(saveShopBtn);sec1.appendChild(s1btn);scroll.appendChild(sec1);
 
   // Background color
@@ -872,7 +886,7 @@ function renderModal(app){
       // Receipt
       const det=document.createElement('details');
       const sum=document.createElement('summary');sum.style.cssText='font-size:12px;color:var(--t3);cursor:pointer;padding:8px 0;text-align:center;list-style:none';sum.textContent='Show receipt preview';
-      const rbox=document.createElement('div');rbox.className='rbox';rbox.style.marginTop='8px';rbox.id='receiptBox';rbox.textContent=receiptStr(m.method,id);
+      const rbox=document.createElement('div');rbox.className='rbox';rbox.style.marginTop='8px';rbox.id='receiptBox';rbox.textContent=receiptStr(m.method,id,'');
       det.appendChild(sum);det.appendChild(rbox);body.appendChild(det);
 
       // Cancel button
@@ -900,16 +914,44 @@ function renderModal(app){
       };
 
     } else {
-      // Non-cash
-      body.innerHTML='<div class="mtitle">Receipt - '+m.method+'</div>';
-      const rbox=document.createElement('div');rbox.className='rbox';rbox.textContent=receiptStr(m.method,id);
-      body.appendChild(rbox);
+      // Non-cash Card/GCash
+      const titleEl=document.createElement('div');titleEl.className='mtitle';
+      titleEl.textContent='Payment - '+m.method;body.appendChild(titleEl);
+      // Total display
+      const totD=document.createElement('div');
+      totD.style.cssText='background:var(--bg0);border-radius:14px;padding:14px 16px;display:flex;justify-content:space-between;align-items:center';
+      totD.innerHTML='<span style="font-size:13px;font-weight:700;color:var(--t3);text-transform:uppercase">Total (VAT incl.)</span><span style="font-size:24px;font-weight:800">'+fmt(tot())+'</span>';
+      body.appendChild(totD);
+      // Reference number input if required
+      let refInp=null;
+      if(S.requireRef){
+        const rf=document.createElement('div');rf.className='mf';
+        rf.innerHTML='<label>Reference / Transaction number *</label>';
+        refInp=document.createElement('input');refInp.type='text';
+        refInp.placeholder='Enter reference number';
+        refInp.style.cssText='width:100%;padding:14px;border-radius:12px;border:2px solid var(--ac);background:var(--bg2);color:var(--t1);font-size:16px;outline:none';
+        rf.appendChild(refInp);body.appendChild(rf);
+      }
+      // Receipt preview
+      const det=document.createElement('details');
+      const sumEl=document.createElement('summary');
+      sumEl.style.cssText='font-size:12px;color:var(--t3);cursor:pointer;padding:8px 0;text-align:center;list-style:none';
+      sumEl.textContent='Show receipt preview';
+      const rb=document.createElement('div');rb.className='rbox';rb.style.marginTop='8px';rb.textContent=receiptStr(m.method,id,'');
+      det.appendChild(sumEl);det.appendChild(rb);body.appendChild(det);
+      // Buttons
       const btns=document.createElement('div');btns.className='mbtns';
       const cancelBtn=document.createElement('button');cancelBtn.textContent='Cancel';cancelBtn.onclick=closeModal;
-      const confirmBtn=document.createElement('button');confirmBtn.className='mpri';confirmBtn.textContent='Confirm sale';
+      const confirmBtn=document.createElement('button');confirmBtn.className='mpri';
+      confirmBtn.style.cssText='flex:1;font-size:15px;padding:14px';
+      confirmBtn.textContent='Confirm sale';
       confirmBtn.onclick=function(){
-        const txid=txId();
-        const tx={id:txid,date:new Date().toISOString(),items:S.cart.map(i=>({name:i.name,qty:i.qty,price:i.price})),total:tot(),method:m.method,receipt:receiptStr(m.method,txid)};
+        if(S.requireRef&&refInp&&!refInp.value.trim()){
+          refInp.style.borderColor='var(--df)';refInp.focus();
+          toast('Please enter reference number');return;
+        }
+        const txid=txId();const refNum=refInp?refInp.value.trim():'';
+        const tx={id:txid,date:new Date().toISOString(),items:S.cart.map(i=>({name:i.name,qty:i.qty,price:i.price})),total:tot(),method:m.method,ref:refNum,receipt:receiptStr(m.method,txid,refNum)};
         S.cart.forEach(ci=>{const p=S.prods.find(x=>x.id===ci.id);if(p&&p.stock!==999)p.stock=Math.max(0,p.stock-ci.qty);});
         S.sales.push(tx);S.salesTotal+=tot();S.cart=[];S.disc=0;S.cashTendered=0;S.cartOpen=false;
         save();closeModal();toast('Sale recorded - '+txid);
