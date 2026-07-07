@@ -116,7 +116,7 @@ input,textarea{user-select:text;-webkit-user-select:text}
 .sum-line{display:flex;justify-content:space-between;font-size:13px;color:var(--text2);padding:3px 0}
 .sum-total-line{display:flex;justify-content:space-between;font-size:20px;font-weight:800;padding:10px 0 12px;border-top:1px solid var(--border);margin-top:4px}
 .pay-row{display:grid;grid-template-columns:1fr 1fr;gap:8px}
-.pay-btn{padding:14px 8px;border-radius:12px;border:1.5px solid var(--border2);background:var(--bg2);color:var(--text1);font-size:13px;font-weight:700;cursor:pointer;text-align:center}
+.pay-btn{padding:18px 8px;border-radius:14px;border:1.5px solid var(--border2);background:var(--bg2);color:var(--text1);font-size:14px;font-weight:700;cursor:pointer;text-align:center;letter-spacing:0.5px}
 .pay-btn:active{background:var(--bg3)}
 .pay-btn.main-pay{grid-column:1/-1;background:var(--accent);color:#fff;border-color:var(--accent);font-size:16px;padding:16px}
 .pay-btn.main-pay:active{opacity:0.85}
@@ -488,10 +488,10 @@ function renderPOS(main){
     +'<div class="sum-line"><span>VAT 12%</span><span>'+fmt(tamt())+'</span></div>'
     +'<div class="sum-total-line"><span>Total</span><span>'+fmt(tot())+'</span></div>'
     +'<div class="pay-row">'
-    +'<button class="pay-btn" data-pay="Cash">CASH</button>'
-    +'<button class="pay-btn" data-pay="Card">CARD</button>'
-    +'<button class="pay-btn" data-pay="GCash">GCASH</button>'
-    +'<button class="pay-btn" data-pay="Transfer">TRANSFER</button>'
+    +'<button class="pay-btn" data-pay="Cash" style="background:#27500a;color:#c0dd97;border-color:#27500a">CASH</button>'
+    +'<button class="pay-btn" data-pay="Card" style="background:#0c447c;color:#85b7eb;border-color:#0c447c">CARD</button>'
+    +'<button class="pay-btn" data-pay="GCash" style="background:#3c3489;color:#afa9ec;border-color:#3c3489">GCASH</button>'
+    +'<button class="pay-btn" data-pay="Transfer" style="background:#633806;color:#fac775;border-color:#633806">TRANSFER</button>'
     +'<button class="pay-btn main-pay" data-pay="Cash">Checkout - '+fmt(tot())+'</button>'
     +'</div></div>';
 
