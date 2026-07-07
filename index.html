@@ -1099,14 +1099,36 @@ function renderModal(app){
     if(filtered.length>0){
       const listHd=document.createElement('div');listHd.style.cssText='font-size:12px;font-weight:700;color:var(--t3);text-transform:uppercase;letter-spacing:0.5px;padding:4px 0';listHd.textContent='Transactions';body.appendChild(listHd);
       filtered.slice().reverse().forEach(function(s){
-        const row=document.createElement('div');row.style.cssText='display:flex;align-items:center;gap:10px;padding:10px 0;border-bottom:1px solid var(--b1);cursor:pointer';
-        const tl=document.createElement('div');tl.style.flex='1';
-        tl.innerHTML='<div style="font-size:12px;color:var(--t3);margin-bottom:2px">'+s.id+(s.ref?' - Ref: '+s.ref:'')+'</div><div style="font-size:13px;font-weight:600">'+s.items.map(function(i){return i.name+' x'+i.qty;}).join(', ')+'</div><div style="font-size:11px;color:var(--t2);margin-top:2px">'+new Date(s.date).toLocaleTimeString([],{hour:'2-digit',minute:'2-digit'})+'</div>';
-        const tr=document.createElement('div');tr.style.cssText='text-align:right;flex-shrink:0';
-        tr.innerHTML='<div style="font-size:14px;font-weight:800">'+fmt(s.total)+'</div><div style="font-size:10px;font-weight:700;padding:2px 7px;border-radius:20px;display:inline-block;margin-top:2px;background:var(--sg);color:var(--st)">'+s.method+'</div>';
-        row.appendChild(tl);row.appendChild(tr);
-        row.onclick=function(){closeModal();openModal({type:'viewtx',tx:s});};
-        body.appendChild(row);
+        const card=document.createElement('div');
+        card.style.cssText='background:var(--bg0);border-radius:12px;padding:12px;margin-bottom:8px;cursor:pointer';
+        card.onclick=function(){closeModal();openModal({type:'viewtx',tx:s});};
+        // Header
+        const hdr=document.createElement('div');
+        hdr.style.cssText='display:flex;align-items:center;justify-content:space-between;margin-bottom:8px;padding-bottom:6px;border-bottom:1px solid var(--b1)';
+        hdr.innerHTML='<div>'
+          +'<div style="font-size:12px;font-weight:700;color:var(--t1)">'+s.id+'</div>'
+          +'<div style="font-size:11px;color:var(--t2);margin-top:2px">'+new Date(s.date).toLocaleTimeString([],{hour:'2-digit',minute:'2-digit'})+' &bull; '+s.method+'</div>'
+          +(s.ref?'<div style="font-size:11px;color:var(--t3);margin-top:2px">Ref: '+s.ref+'</div>':'')
+          +'</div>'
+          +'<div style="text-align:right">'
+          +'<div style="font-size:18px;font-weight:800;color:var(--ac)">'+fmt(s.total)+'</div>'
+          +'</div>';
+        card.appendChild(hdr);
+        // Items list
+        s.items.forEach(function(it){
+          const irow=document.createElement('div');
+          irow.style.cssText='display:flex;justify-content:space-between;align-items:center;padding:4px 0;font-size:13px';
+          irow.innerHTML='<div style="display:flex;align-items:center;gap:8px">'
+            +'<span style="font-size:11px;font-weight:700;color:var(--t3);background:var(--bg2);border-radius:6px;padding:2px 6px;min-width:28px;text-align:center">x'+it.qty+'</span>'
+            +'<span style="color:var(--t1)">'+it.name+'</span>'
+            +'</div>'
+            +'<div style="display:flex;flex-direction:column;align-items:flex-end">'
+            +'<span style="font-size:11px;color:var(--t3)">'+fmt(it.price)+' each</span>'
+            +'<span style="font-size:13px;font-weight:700;color:var(--t1)">'+fmt(it.price*it.qty)+'</span>'
+            +'</div>';
+          card.appendChild(irow);
+        });
+        body.appendChild(card);
       });
     } else {
       const empty=document.createElement('div');empty.style.cssText='text-align:center;color:var(--t3);font-size:14px;padding:32px 0';empty.textContent='No transactions found.';body.appendChild(empty);
@@ -1117,26 +1139,55 @@ function renderModal(app){
     const closeB=document.createElement('button');closeB.textContent='Close';closeB.onclick=closeModal;
     const printB=document.createElement('button');printB.className='abtn pri';printB.textContent='Print report';
     printB.onclick=function(){
-      const pa=document.getElementById('print-area');
-      const w=32;const line='-'.repeat(w);
+      const w=36;const line='='.repeat(w);const dline='-'.repeat(w);
       const lp=function(s,n){return String(s).length>=n?String(s).slice(0,n):String(s)+' '.repeat(n-String(s).length);};
       const rp=function(s,n){return String(s).length>=n?String(s).slice(0,n):' '.repeat(n-String(s).length)+String(s);};
-      let rows=[lp(S.bizName,w),line,'DAILY SALES REPORT',label,new Date().toLocaleString(),line,
-        'Total transactions: '+filtered.length,
-        lp('Total revenue:',w-fmt(totalAmt).length)+fmt(totalAmt),
-        lp('Cash:',w-fmt(cashAmt).length)+fmt(cashAmt),
-        lp('Card:',w-fmt(cardAmt).length)+fmt(cardAmt),
-        lp('GCash:',w-fmt(gcashAmt).length)+fmt(gcashAmt),
-        line,'TRANSACTIONS',line];
+      let html='<html><head><title>Sales Report - '+label+'</title>'
+        +'<style>body{font-family:monospace;font-size:13px;color:#000;padding:20px;max-width:400px;margin:0 auto}'
+        +'table{width:100%;border-collapse:collapse;margin:8px 0}'
+        +'td{padding:3px 6px;font-size:12px}'
+        +'td.r{text-align:right}'
+        +'.hd{font-weight:bold;border-bottom:1px solid #000}'
+        +'.tx{border-bottom:1px solid #ccc;padding:8px 0;margin:6px 0}'
+        +'@media print{button{display:none}}'
+        +'</style></head><body>';
+      html+='<div style="text-align:center"><strong style="font-size:16px">'+S.bizName+'</strong><br/>';
+      html+='<strong>DAILY SALES REPORT</strong><br/>';
+      html+=label+'<br/>'+new Date().toLocaleString()+'</div>';
+      html+='<hr/>';
+      html+='<table>'
+        +'<tr><td>Total transactions</td><td class="r"><strong>'+filtered.length+'</strong></td></tr>'
+        +'<tr><td>Total revenue</td><td class="r"><strong>'+fmt(totalAmt)+'</strong></td></tr>'
+        +'<tr><td>Cash</td><td class="r">'+fmt(cashAmt)+'</td></tr>'
+        +'<tr><td>Card</td><td class="r">'+fmt(cardAmt)+'</td></tr>'
+        +'<tr><td>GCash</td><td class="r">'+fmt(gcashAmt)+'</td></tr>'
+        +'</table><hr/>';
+      html+='<strong>TRANSACTIONS</strong><br/>';
       filtered.slice().reverse().forEach(function(s){
-        rows.push(s.id+' '+new Date(s.date).toLocaleTimeString([],{hour:'2-digit',minute:'2-digit'}));
-        rows.push(s.items.map(function(i){return i.name+' x'+i.qty;}).join(', '));
-        if(s.ref)rows.push('Ref: '+s.ref);
-        const tot=fmt(s.total);rows.push(lp(s.method,w-tot.length)+tot);rows.push('');
+        html+='<div class="tx">';
+        html+='<div style="display:flex;justify-content:space-between">'
+          +'<span style="font-size:11px;color:#666">'+s.id+' &bull; '+new Date(s.date).toLocaleTimeString([],{hour:'2-digit',minute:'2-digit'})+'</span>'
+          +'<span style="font-size:11px;color:#666">'+s.method+'</span>'
+          +'</div>';
+        if(s.ref)html+='<div style="font-size:11px;color:#666">Ref: '+s.ref+'</div>';
+        html+='<table style="margin:4px 0">';
+        s.items.forEach(function(it){
+          html+='<tr>'
+            +'<td style="padding:2px 0">x'+it.qty+'</td>'
+            +'<td style="padding:2px 6px">'+it.name+'</td>'
+            +'<td class="r" style="padding:2px 0">'+fmt(it.price*it.qty)+'</td>'
+            +'</tr>';
+        });
+        html+='</table>';
+        html+='<div style="text-align:right;font-weight:bold;border-top:1px solid #eee;padding-top:2px">Total: '+fmt(s.total)+'</div>';
+        html+='</div>';
       });
-      rows.push(line);rows.push(rp('Powered by Arroyo POS',w));
-      pa.innerHTML='<pre style="font-family:monospace;font-size:12px;color:#000">'+rows.join('\n')+'</pre>';
-      window.print();
+      html+='<hr/><div style="text-align:center;font-size:11px;color:#666">Powered by Arroyo POS</div>';
+      html+='<br/><div style="text-align:center"><button onclick="window.print()" style="padding:10px 24px;font-size:14px;cursor:pointer">Print</button></div>';
+      html+='</body></html>';
+      const win=window.open('','_blank','width=420,height=700');
+      if(win){win.document.write(html);win.document.close();}
+      else{toast('Allow popups to print report');}
     };
     printRow.appendChild(closeB);printRow.appendChild(printB);body.appendChild(printRow);
   }
