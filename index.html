@@ -702,25 +702,19 @@ function renderModal(app){
         +'<div class="change-row"><span>Cash tendered</span><span>'+fmt(ct)+'</span></div>'
         +'<div class="change-total-row"><span>Change</span><span class="'+(change>=0?'change-pos':'change-neg')+'">'+(change>=0?fmt(change):'--')+'</span></div>'
         +'</div>'
-        +'<div class="receipt-box">'+receiptStr(m.method,id)+'</div>'
-        +'<div class="mbtns"><button id="mClose">Cancel</button><button class="mpri" id="mFinish" '+(isCash&&ct<tot()?'style="opacity:0.4;pointer-events:none"':'')+'>Confirm sale</button></div>'
+        +'<div style="background:var(--bg0);border-radius:14px;padding:16px;margin-bottom:10px;display:flex;justify-content:space-between;align-items:center">'
+        +'<div style="text-align:left"><div style="font-size:11px;font-weight:700;color:var(--text3);text-transform:uppercase;letter-spacing:0.5px;margin-bottom:4px">Change</div><div id="liveChange2" style="font-size:28px;font-weight:800;color:'+(change>=0?'var(--success-text)':'var(--danger-text)')+'">'+(change>=0?fmt(change):'--')+'</div></div>'
+        +'<div style="text-align:right"><div style="font-size:11px;font-weight:700;color:var(--text3);text-transform:uppercase;letter-spacing:0.5px;margin-bottom:4px">Total</div><div style="font-size:16px;font-weight:700">'+fmt(tot())+'</div></div>'
+        +'</div>'
+        +'<div class="mbtns" style="margin-bottom:10px"><button id="mClose" style="padding:14px 18px;min-width:80px">Cancel</button><button class="mpri" id="mFinish" style="flex:1;font-size:15px;padding:14px">'+(ct>=tot()?'Confirm sale':'Enter cash amount')+'</button></div>'
+        +'<details><summary style="font-size:12px;color:var(--text3);cursor:pointer;padding:8px 0;list-style:none;text-align:center">Show receipt preview</summary><div class="receipt-box" style="margin-top:8px">'+receiptStr(m.method,id)+'</div></details>'
         :
         '<div class="modal-title">Receipt - '+m.method+'</div>'
-        +'<div class="receipt-box">'+receiptStr(m.method,id)+'</div>'
-        +'<div class="mbtns"><button id="mClose">Cancel</button><button class="mpri" id="mFinish">Confirm sale</button></div>'
+        +'<div class="mbtns" style="margin-bottom:10px"><button id="mClose" style="padding:14px 18px;min-width:80px">Cancel</button><button class="mpri" id="mFinish" style="flex:1;font-size:15px;padding:14px">Confirm sale - '+fmt(tot())+'</button></div>'
+        +'<details><summary style="font-size:12px;color:var(--text3);cursor:pointer;padding:8px 0;list-style:none;text-align:center">Show receipt preview</summary><div class="receipt-box" style="margin-top:8px">'+receiptStr(m.method,id)+'</div></details>'
       )
       +'</div></div>';
-  } else if(m.type==='viewtx'){
-    inner='<div class="modal-sheet"><div class="modal-drag"></div><div class="modal-body"><div class="modal-title">'+m.tx.id+'</div><div class="receipt-box">'+m.tx.receipt+'</div><div class="mbtns"><button id="mClose">Close</button></div></div></div>';
-  } else if(m.type==='creatorAuth'){
-    inner='<div class="modal-sheet"><div class="modal-drag"></div><div class="modal-body"><div class="modal-badge">Creator access required</div><div class="modal-title">Change business type</div><p style="font-size:14px;color:var(--text2);line-height:1.6">Enter the creator password to continue.</p><div class="mf"><label>Creator password</label><input type="password" id="cpInput" placeholder="Creator password" /></div><span id="cpErr" style="font-size:13px;color:var(--danger-text);display:block;min-height:18px"></span><div class="mbtns"><button id="mClose">Cancel</button><button class="mpri" id="cpVerify">Verify</button></div></div></div>';
-  } else if(m.type==='changeBiz'){
-    inner='<div class="modal-sheet"><div class="modal-drag"></div><div class="modal-body"><div class="modal-badge">Creator access granted</div><div class="modal-title">Change business type</div><p style="font-size:14px;color:var(--danger-text);line-height:1.6">Products will reset to defaults. Sales history is preserved.</p><div class="mf"><label>New business type</label><select id="nbizSel">'+BT.map(b=>'<option value="'+b.id+'"'+(b.id===S.biz?' selected':'')+'>'+b.label+'</option>').join('')+'</select></div><div class="mbtns"><button id="mClose">Cancel</button><button class="mpri" style="background:var(--pro-bg)" id="confirmBiz">Change</button></div></div></div>';
-  } else if(m.type==='prod'){
-    const p=m.prod;const isNew=!p;const pp=p||{name:'',price:'',cat:'',icon:'ITEM',stock:''};
-    const cats=[...new Set(S.prods.map(x=>x.cat))];
-    inner='<div class="modal-sheet"><div class="modal-drag"></div><div class="modal-body">'
-      +'<div class="modal-title">'+(isNew?'Add product':'Edit product')+'</div>'
+
       +'<div class="mf"><label>Name</label><input id="pNm" value="'+pp.name+'" placeholder="Product name" /></div>'
       +'<div style="display:grid;grid-template-columns:1fr 1fr;gap:12px">'
       +'<div class="mf"><label>Price</label><input id="pPr" type="number" value="'+pp.price+'" min="0" /></div>'
@@ -740,17 +734,39 @@ function renderModal(app){
   ov.querySelector('#mClose')?.addEventListener('click',closeModal);
 
   if(m.type==='pay'&&m.method==='Cash'){
-    ov.querySelector('#cashManual')?.addEventListener('input',e=>{
-      const v=parseFloat(e.target.value)||0;
-      S.cashTendered=v;
-      const change=v-tot();
-      const tenEl=ov.querySelector('#liveTendered');
-      const chEl=ov.querySelector('#liveChange');
-      const finBtn=ov.querySelector('#mFinish');
-      if(tenEl)tenEl.textContent=fmt(v);
-      if(chEl){chEl.textContent=change>=0?fmt(change):'--';chEl.className=change>=0?'change-pos':'change-neg';}
-      if(finBtn){finBtn.style.opacity=v>=tot()?'1':'0.4';finBtn.style.pointerEvents=v>=tot()?'auto':'none';}
-    });
+    const cashInput=ov.querySelector('#cashManual');
+    if(cashInput){
+      cashInput.focus();
+      cashInput.addEventListener('input',e=>{
+        const v=parseFloat(e.target.value)||0;
+        const change=v-tot();
+        const chEl2=ov.querySelector('#liveChange2');
+        const tenEl=ov.querySelector('#liveTendered');
+        const chEl=ov.querySelector('#liveChange');
+        const finBtn=ov.querySelector('#mFinish');
+        if(chEl2){
+          chEl2.textContent=change>=0?fmt(change):'--';
+          chEl2.style.color=change>=0?'var(--success-text)':'var(--danger-text)';
+          chEl2.style.fontSize=change>=0?'32px':'24px';
+        }
+        if(tenEl)tenEl.textContent=fmt(v);
+        if(chEl){chEl.textContent=change>=0?fmt(change):'--';chEl.className=change>=0?'change-pos':'change-neg';}
+        if(finBtn){
+          if(v>=tot()){
+            finBtn.textContent='Confirm sale';
+            finBtn.style.opacity='1';
+            finBtn.style.pointerEvents='auto';
+            finBtn.style.background='var(--accent)';
+          } else {
+            finBtn.textContent='Enter cash amount';
+            finBtn.style.opacity='0.45';
+            finBtn.style.pointerEvents='none';
+            finBtn.style.background='#666';
+          }
+        }
+        S.cashTendered=v;
+      });
+    }
     ov.querySelectorAll('.qkset').forEach(b=>b.addEventListener('click',()=>{S.cashTendered=+b.dataset.set;openModal({type:'pay',method:'Cash'});}));
     ov.querySelectorAll('.qk-btn[data-add]').forEach(b=>b.addEventListener('click',()=>{const a=+b.dataset.add;S.cashTendered=a===0?0:(S.cashTendered||0)+a;openModal({type:'pay',method:'Cash'});}));
   }
