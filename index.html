@@ -679,7 +679,6 @@ function renderTopNav(app){
   else{const ph=document.createElement('div');ph.className='brand-logo-ph';ph.textContent=(S.bizName||'AP').slice(0,2).toUpperCase();brand.appendChild(ph);}
 
   const nm=document.createElement('div');nm.className='brand-name';nm.textContent=S.bizName;brand.appendChild(nm);
-  brand.innerHTML+='';//keep children, add tag
   const tag=document.createElement('span');tag.className='brand-tag';tag.textContent=b.label;brand.appendChild(tag);
 
   if(S.activeCashier){
@@ -925,18 +924,54 @@ function renderInv(scr){
   S.prods.forEach(p=>{
     const out=p.stock!==999&&p.stock<=0,low=p.stock!==999&&p.stock>0&&p.stock<=5;
     const row=document.createElement('div');row.className='inv-row';
-    if(p.img){const im=document.createElement('img');im.src=p.img;im.className='inv-img';im.onerror=function(){this.style.display='none';};row.appendChild(im);}
-    else{row.innerHTML='<div class="inv-ico">'+p.icon+'</div>';}
+
+    // Icon or image
+    if(p.img){
+      const im=document.createElement('img');im.src=p.img;im.className='inv-img';
+      im.onerror=function(){this.style.display='none';};row.appendChild(im);
+    } else {
+      const ic=document.createElement('div');ic.className='inv-ico';ic.textContent=p.icon;row.appendChild(ic);
+    }
+
+    // Name + category
     const infoDiv=document.createElement('div');infoDiv.className='inv-info';
-    infoDiv.innerHTML='<div class="inv-name">'+p.name+(p.variants&&p.variants.length?'<span style="font-size:10px;color:var(--pt);font-weight:700;margin-left:6px">'+p.variants.length+' var</span>':'')+'</div><div class="inv-cat">'+p.cat+'</div>';
-    row.appendChild(infoDiv);
+    const nameDiv=document.createElement('div');nameDiv.className='inv-name';nameDiv.textContent=p.name;
+    if(p.variants&&p.variants.length){
+      const vs=document.createElement('span');vs.style.cssText='font-size:10px;color:var(--pt);font-weight:700;margin-left:6px';vs.textContent=p.variants.length+' var';nameDiv.appendChild(vs);
+    }
+    const catDiv=document.createElement('div');catDiv.className='inv-cat';catDiv.textContent=p.cat;
+    infoDiv.appendChild(nameDiv);infoDiv.appendChild(catDiv);row.appendChild(infoDiv);
+
+    // Right section: price + stock badge + action buttons
+    const ir=document.createElement('div');ir.className='inv-r';
+
+    // Price (sale or regular)
     const invEffPrice=(p.salePct>0)?+(p.price*(1-p.salePct/100)).toFixed(2):p.price;
-    const invPriceHtml=p.salePct>0
-      ?'<div style="text-align:right"><div class="pprice-orig" style="font-size:11px">'+fmt(p.price)+'</div><div class="pprice-sale" style="font-size:14px">'+fmt(invEffPrice)+'</div><div style="font-size:9px;color:var(--df);font-weight:700">-'+p.salePct+'% SALE</div></div>'
-      :'<div class="inv-price">'+fmt(p.price)+'</div>';
-    row.innerHTML+='<div class="inv-r">'+invPriceHtml+'<span class="badge '+(out?'b-out':low?'b-low':'b-ok')+'">'+(p.stock===999?'inf':out?'out':low?p.stock+' low':p.stock)+'</span><div class="acts"><button class="act" data-pid="'+p.id+'">ED</button><button class="act del" data-pid="'+p.id+'">DEL</button></div></div>';
-    row.querySelectorAll('.act:not(.del)').forEach(b=>b.onclick=function(){const pr=S.prods.find(x=>x.id===+this.dataset.pid);if(pr)openModal({type:'prod',prod:{...pr}});});
-    row.querySelectorAll('.act.del').forEach(b=>b.onclick=function(){openModal({type:'confirm',pid:+this.dataset.pid});});
+    if(p.salePct>0){
+      const pd=document.createElement('div');pd.style.cssText='text-align:right';
+      const po=document.createElement('div');po.className='pprice-orig';po.style.fontSize='11px';po.textContent=fmt(p.price);
+      const ps=document.createElement('div');ps.className='pprice-sale';ps.style.fontSize='14px';ps.textContent=fmt(invEffPrice);
+      const sl=document.createElement('div');sl.style.cssText='font-size:9px;color:var(--df);font-weight:700';sl.textContent='-'+p.salePct+'% SALE';
+      pd.appendChild(po);pd.appendChild(ps);pd.appendChild(sl);ir.appendChild(pd);
+    } else {
+      const pr2=document.createElement('div');pr2.className='inv-price';pr2.textContent=fmt(p.price);ir.appendChild(pr2);
+    }
+
+    // Stock badge
+    const badge=document.createElement('span');
+    badge.className='badge '+(out?'b-out':low?'b-low':'b-ok');
+    badge.textContent=p.stock===999?'inf':out?'out':low?p.stock+' low':p.stock;
+    ir.appendChild(badge);
+
+    // Edit + Delete buttons — created with proper onclick, no querySelectorAll needed
+    const acts=document.createElement('div');acts.className='acts';
+    const edBtn=document.createElement('button');edBtn.className='act';edBtn.textContent='ED';
+    edBtn.onclick=function(){openModal({type:'prod',prod:JSON.parse(JSON.stringify(p))});};
+    const delBtn=document.createElement('button');delBtn.className='act del';delBtn.textContent='DEL';
+    delBtn.onclick=function(){openModal({type:'confirm',pid:p.id});};
+    acts.appendChild(edBtn);acts.appendChild(delBtn);ir.appendChild(acts);
+
+    row.appendChild(ir);
     list.appendChild(row);
   });
   scr.appendChild(list);
@@ -957,9 +992,11 @@ function renderHist(scr){
   const totalAmt=filt.filter(s=>!s.voided).reduce((a,s)=>a+s.total,0);
 
   const hd=document.createElement('div');hd.className='panel-hd';
-  hd.innerHTML='<h2>History</h2>';
+  const hdTitle=document.createElement('h2');hdTitle.textContent='History';hd.appendChild(hdTitle);
   const expBtn=document.createElement('button');expBtn.className='abtn';expBtn.style.cssText='font-size:12px;padding:7px 12px';expBtn.textContent='CSV';expBtn.onclick=function(){exportCSV(filt);};hd.appendChild(expBtn);
-  hd.innerHTML+='<div style="text-align:right"><div style="font-size:16px;font-weight:800">'+fmt(totalAmt)+'</div><div style="font-size:11px;color:var(--t3)">'+filt.filter(s=>!s.voided).length+' transactions</div></div>';
+  const hdTot=document.createElement('div');hdTot.style.cssText='text-align:right';
+  hdTot.innerHTML='<div style="font-size:16px;font-weight:800">'+fmt(totalAmt)+'</div><div style="font-size:11px;color:var(--t3)">'+filt.filter(s=>!s.voided).length+' transactions</div>';
+  hd.appendChild(hdTot);
   scr.appendChild(hd);
 
   const bar=document.createElement('div');bar.className='hist-bar';
