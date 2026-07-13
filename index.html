@@ -134,7 +134,7 @@ input,select,textarea{user-select:text;-webkit-user-select:text}
 .act{width:36px;height:36px;border-radius:10px;border:1.5px solid var(--b1);background:none;cursor:pointer;display:flex;align-items:center;justify-content:center;color:var(--t2);font-size:11px;font-weight:700}
 .act:active{background:var(--bg2)}
 .act.del:active{background:var(--dg);color:var(--dt)}
-.add-fab{position:absolute;bottom:16px;right:16px;width:56px;height:56px;border-radius:50%;background:var(--ac);border:none;color:#fff;font-size:28px;cursor:pointer;display:flex;align-items:center;justify-content:center;box-shadow:0 4px 20px rgba(0,0,0,0.4);z-index:5}
+.add-fab{position:fixed;bottom:calc(20px + env(safe-area-inset-bottom));right:20px;width:56px;height:56px;border-radius:50%;background:var(--ac);border:none;color:#fff;font-size:28px;cursor:pointer;display:flex;align-items:center;justify-content:center;box-shadow:0 4px 20px rgba(0,0,0,0.4);z-index:400}
 .add-fab:active{opacity:0.85}
 
 /* HISTORY */
@@ -1536,14 +1536,18 @@ function renderModal(app){
     saleOpts.forEach(o=>{const op=document.createElement('option');op.value=o.v;op.textContent=o.l;if((pp.salePct||0)===o.v)op.selected=true;saleSel.appendChild(op);});
     const salePreview=document.createElement('div');salePreview.style.cssText='font-size:13px;color:var(--df);font-weight:700;flex-shrink:0';
     function updateSalePreview(){
-      const basePrice=parseFloat(document.getElementById('pPr').value)||pp.price||0;
+      const prEl=document.getElementById('pPr');
+      const basePrice=prEl?parseFloat(prEl.value)||0:parseFloat(pp.price)||0;
       const pct=parseInt(saleSel.value)||0;
       salePreview.textContent=pct>0?'→ '+fmt(+(basePrice*(1-pct/100)).toFixed(2)):'';
     }
     saleSel.onchange=updateSalePreview;
-    // also update when price changes
-    setTimeout(()=>{const prInp=document.getElementById('pPr');if(prInp)prInp.addEventListener('input',updateSalePreview);},50);
-    updateSalePreview();
+    // Wire price input after grid is in DOM
+    setTimeout(()=>{
+      const prInp=document.getElementById('pPr');
+      if(prInp)prInp.addEventListener('input',updateSalePreview);
+      updateSalePreview();
+    },80);
     saleRow.appendChild(saleSel);saleRow.appendChild(salePreview);mfSale.appendChild(saleRow);grid.appendChild(mfSale);
 
 
