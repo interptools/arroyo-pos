@@ -268,6 +268,22 @@ input,select,textarea{user-select:text;-webkit-user-select:text}
 
 /* LOW badge on product card */
 .pcard.low::after{content:'LOW';position:absolute;top:6px;right:6px;font-size:8px;font-weight:800;color:var(--wt);background:var(--wg);padding:2px 5px;border-radius:4px;letter-spacing:0.3px}
+/* SALE badge on product card */
+.pcard.on-sale .sale-badge{position:absolute;top:6px;left:6px;font-size:8px;font-weight:800;color:#fff;background:var(--df);padding:2px 5px;border-radius:4px;letter-spacing:0.3px}
+.pprice-orig{font-size:10px;color:var(--t3);text-decoration:line-through;line-height:1}
+.pprice-sale{font-size:12px;font-weight:700;color:var(--df)}
+/* Disc live preview */
+.disc-preview{background:var(--bg0);border-radius:10px;padding:10px 12px;font-size:13px;display:flex;flex-direction:column;gap:4px;margin-bottom:4px}
+.disc-row-live{display:flex;justify-content:space-between;color:var(--t2)}
+.disc-row-live.total{font-size:15px;font-weight:800;color:var(--t1);border-top:1px solid var(--b1);padding-top:6px;margin-top:2px}
+.disc-row-live.saving{color:var(--st);font-weight:700}
+/* Disc input upgraded */
+.disc-wrap{display:flex;gap:8px;margin-bottom:6px;align-items:center}
+.disc-wrap input{flex:1;padding:9px 10px;border-radius:10px;border:1.5px solid var(--b2);background:var(--bg2);color:var(--t1);font-size:14px;outline:none}
+.disc-wrap select{padding:9px 8px;border-radius:10px;border:1.5px solid var(--b2);background:var(--bg2);color:var(--t1);font-size:14px;outline:none}
+.disc-quick{display:flex;gap:6px;flex-wrap:wrap;margin-bottom:8px}
+.disc-qbtn{padding:6px 12px;border-radius:20px;border:1.5px solid var(--b2);background:var(--bg2);color:var(--t2);font-size:12px;font-weight:700;cursor:pointer;white-space:nowrap}
+.disc-qbtn:active,.disc-qbtn.active{background:var(--ac);color:#fff;border-color:var(--ac)}
 .pimg{width:52px;height:52px;border-radius:8px;object-fit:cover;flex-shrink:0}
 .inv-img{width:44px;height:44px;border-radius:8px;object-fit:cover;flex-shrink:0;border:1px solid var(--b1)}
 
@@ -739,22 +755,30 @@ function renderPOS(scr){
   grid.style.paddingBottom=n>0?'100px':'12px';
   items.forEach(p=>{
     const out=p.stock!==999&&p.stock<=0,low=p.stock!==999&&p.stock>0&&p.stock<=5;
+    const effPrice=(p.salePct>0)?+(p.price*(1-p.salePct/100)).toFixed(2):p.price;
     const card=document.createElement('div');
-    card.className='pcard'+(low?' low':'')+(out?' out':'');
-    // Use inner div for square layout
+    card.className='pcard'+(low?' low':'')+(out?' out':'')+(p.salePct>0?' on-sale':'');
     const inner=document.createElement('div');inner.className='pcard-inner';
+    if(p.salePct>0){const sb=document.createElement('div');sb.className='sale-badge';sb.textContent='SALE -'+p.salePct+'%';inner.appendChild(sb);}
     if(p.img){
       const im=document.createElement('img');im.src=p.img;im.className='pimg';im.onerror=function(){this.style.display='none';};inner.appendChild(im);
     } else {
       const ico=document.createElement('div');ico.className='pico';ico.textContent=p.icon;inner.appendChild(ico);
     }
-    inner.innerHTML+='<div class="pname">'+p.name+'</div><div class="pprice">'+fmt(p.price)+'</div><div class="pstock">'+(p.stock===999?'unlimited':out?'out of stock':low?p.stock+' left':p.stock+' in stock')+'</div>';
+    const pnm=document.createElement('div');pnm.className='pname';pnm.textContent=p.name;inner.appendChild(pnm);
+    if(p.salePct>0){
+      const po=document.createElement('div');po.className='pprice-orig';po.textContent=fmt(p.price);inner.appendChild(po);
+      const ps=document.createElement('div');ps.className='pprice-sale';ps.textContent=fmt(effPrice);inner.appendChild(ps);
+    } else {
+      const pp2=document.createElement('div');pp2.className='pprice';pp2.textContent=fmt(p.price);inner.appendChild(pp2);
+    }
+    const pst=document.createElement('div');pst.className='pstock';pst.textContent=p.stock===999?'unlimited':out?'out of stock':low?p.stock+' left':p.stock+' in stock';inner.appendChild(pst);
     if(p.variants&&p.variants.length>0){const vh=document.createElement('div');vh.style.cssText='font-size:9px;color:var(--pt);font-weight:700;margin-top:2px';vh.textContent=p.variants.length+' variants';inner.appendChild(vh);}
     card.appendChild(inner);
     card.onclick=function(){
       if(p.variants&&p.variants.length>0){openModal({type:'variantPick',prod:p});return;}
       const ex=S.cart.find(i=>i.id===p.id&&!i.variantLabel);
-      if(ex)ex.qty++;else S.cart.push({id:p.id,name:p.name,price:p.price,qty:1,note:''});
+      if(ex)ex.qty++;else S.cart.push({id:p.id,name:p.name,price:effPrice,qty:1,note:'',origPrice:p.salePct>0?p.price:null,salePct:p.salePct||0});
       render();toast(p.name+' added');
     };
     grid.appendChild(card);
@@ -811,28 +835,56 @@ function renderCart(scr){
 
   const foot=document.createElement('div');foot.className='cart-foot';
 
-  const dr=document.createElement('div');dr.className='disc-row';
-  const di=document.createElement('input');di.type='number';di.min='0';di.placeholder='Discount';di.value=S.disc||'';
-  di.oninput=function(){S.disc=parseFloat(this.value)||0;render();};
-  const ds=document.createElement('select');
+  // Discount input + type selector
+  const dw=document.createElement('div');dw.className='disc-wrap';
+  const di=document.createElement('input');di.type='number';di.min='0';di.placeholder='Discount amount';di.value=S.disc||'';di.id='discInp';
+  const ds=document.createElement('select');ds.id='discTypeSel';
   ['%','flat'].forEach(v=>{const o=document.createElement('option');o.value=v;o.textContent=v;if(v===S.discType)o.selected=true;ds.appendChild(o);});
-  ds.onchange=function(){S.discType=this.value;render();};
-  dr.appendChild(di);dr.appendChild(ds);foot.appendChild(dr);
+  dw.appendChild(di);dw.appendChild(ds);foot.appendChild(dw);
 
-  const rows=[
-    ['Subtotal',fmt(sub())],
-    ...(S.disc>0?[['Discount','-'+fmt(damt())]]:[] ),
-    ['VAT 12%',fmt(tamt())]
-  ];
-  rows.forEach(([l,v])=>{
-    if(l==='VAT 12%') return;
-    const r=document.createElement('div');r.className='sum';
-    r.innerHTML='<span>'+l+'</span><span>'+(l==='Discount'?'<span style="color:var(--st)">'+v+'</span>':v)+'</span>';
-    foot.appendChild(r);
+  // Quick % shortcut buttons
+  const dq=document.createElement('div');dq.className='disc-quick';
+  [5,10,15,20,25,30,50].forEach(pct=>{
+    const qb=document.createElement('button');
+    qb.className='disc-qbtn'+(S.disc===pct&&S.discType==='%'?' active':'');
+    qb.textContent=pct+'%';
+    qb.onclick=function(){
+      if(S.disc===pct&&S.discType==='%'){S.disc=0;di.value='';}
+      else{S.disc=pct;S.discType='%';di.value=pct;ds.value='%';}
+      buildPreview(S.disc,S.discType);
+      dq.querySelectorAll('.disc-qbtn').forEach(b=>{b.className='disc-qbtn'+(b.textContent===S.disc+'%'&&S.discType==='%'?' active':'');});
+    };
+    dq.appendChild(qb);
   });
-  const st=document.createElement('div');st.className='sum-total';
-  st.innerHTML='<span>Total</span><span>'+fmt(tot())+'</span>';
-  foot.appendChild(st);
+  foot.appendChild(dq);
+
+  // Live preview box
+  const prev=document.createElement('div');prev.className='disc-preview';
+  function buildPreview(discVal,discTypeVal){
+    const s2=sub();
+    const da=discTypeVal==='%'?s2*Math.min(discVal,100)/100:Math.min(discVal,s2);
+    const total2=s2-da;
+    prev.innerHTML='';
+    const r1=document.createElement('div');r1.className='disc-row-live';
+    r1.innerHTML='<span>Subtotal</span><span>'+fmt(s2)+'</span>';prev.appendChild(r1);
+    if(da>0){
+      const r2=document.createElement('div');r2.className='disc-row-live saving';
+      const label='Discount '+(discTypeVal==='%'?'('+Math.min(Math.round(discVal),100)+'%)':'(flat)');
+      r2.innerHTML='<span>'+label+'</span><span>- '+fmt(da)+'</span>';prev.appendChild(r2);
+    }
+    const r3=document.createElement('div');r3.className='disc-row-live total';
+    r3.innerHTML='<span>Total</span><span>'+fmt(total2)+'</span>';prev.appendChild(r3);
+  }
+  buildPreview(S.disc,S.discType);
+  foot.appendChild(prev);
+
+  di.oninput=function(){
+    const v=parseFloat(this.value)||0;S.disc=v;
+    buildPreview(v,S.discType);
+    dq.querySelectorAll('.disc-qbtn').forEach(b=>{b.className='disc-qbtn'+(b.textContent===v+'%'&&S.discType==='%'?' active':'');});
+  };
+  ds.onchange=function(){S.discType=this.value;buildPreview(S.disc,S.discType);};
+  di.onblur=function(){render();};
 
   const pg=document.createElement('div');pg.className='pay-grid';
   [
@@ -878,7 +930,11 @@ function renderInv(scr){
     const infoDiv=document.createElement('div');infoDiv.className='inv-info';
     infoDiv.innerHTML='<div class="inv-name">'+p.name+(p.variants&&p.variants.length?'<span style="font-size:10px;color:var(--pt);font-weight:700;margin-left:6px">'+p.variants.length+' var</span>':'')+'</div><div class="inv-cat">'+p.cat+'</div>';
     row.appendChild(infoDiv);
-    row.innerHTML+='<div class="inv-r"><div class="inv-price">'+fmt(p.price)+'</div><span class="badge '+(out?'b-out':low?'b-low':'b-ok')+'">'+(p.stock===999?'inf':out?'out':low?p.stock+' low':p.stock)+'</span><div class="acts"><button class="act" data-pid="'+p.id+'">ED</button><button class="act del" data-pid="'+p.id+'">DEL</button></div></div>';
+    const invEffPrice=(p.salePct>0)?+(p.price*(1-p.salePct/100)).toFixed(2):p.price;
+    const invPriceHtml=p.salePct>0
+      ?'<div style="text-align:right"><div class="pprice-orig" style="font-size:11px">'+fmt(p.price)+'</div><div class="pprice-sale" style="font-size:14px">'+fmt(invEffPrice)+'</div><div style="font-size:9px;color:var(--df);font-weight:700">-'+p.salePct+'% SALE</div></div>'
+      :'<div class="inv-price">'+fmt(p.price)+'</div>';
+    row.innerHTML+='<div class="inv-r">'+invPriceHtml+'<span class="badge '+(out?'b-out':low?'b-low':'b-ok')+'">'+(p.stock===999?'inf':out?'out':low?p.stock+' low':p.stock)+'</span><div class="acts"><button class="act" data-pid="'+p.id+'">ED</button><button class="act del" data-pid="'+p.id+'">DEL</button></div></div>';
     row.querySelectorAll('.act:not(.del)').forEach(b=>b.onclick=function(){const pr=S.prods.find(x=>x.id===+this.dataset.pid);if(pr)openModal({type:'prod',prod:{...pr}});});
     row.querySelectorAll('.act.del').forEach(b=>b.onclick=function(){openModal({type:'confirm',pid:+this.dataset.pid});});
     list.appendChild(row);
@@ -1422,7 +1478,7 @@ function renderModal(app){
     if(pp.img){const remImg=document.createElement('button');remImg.className='abtn';remImg.textContent='Remove';remImg.style.cssText='font-size:11px;padding:5px 10px';remImg.onclick=function(){pendingImg=null;imgPrev.innerHTML='';imgPrev.style.cssText='width:64px;height:64px;border-radius:10px;border:1.5px dashed var(--b2);display:flex;align-items:center;justify-content:center;font-size:22px;color:var(--t3)';imgPrev.textContent='📷';};imgRow.appendChild(remImg);}
     imgRow.appendChild(imgInp);imgMf.appendChild(imgRow);grid.appendChild(imgMf);
 
-    [{id:'pNm',lbl:'Name',type:'text',val:pp.name,ph:'Product name'},{id:'pPr',lbl:'Price',type:'number',val:pp.price,ph:'0'},{id:'pSt',lbl:'Stock (blank = unlimited)',type:'number',val:pp.stock===999?'':pp.stock,ph:''}].forEach(f=>{
+    [{id:'pNm',lbl:'Name',type:'text',val:pp.name,ph:'Product name'},{id:'pPr',lbl:'Price (original / regular)',type:'number',val:pp.price,ph:'0'},{id:'pSt',lbl:'Stock (blank = unlimited)',type:'number',val:pp.stock===999?'':pp.stock,ph:''}].forEach(f=>{
       const mf=document.createElement('div');mf.className='mf';mf.innerHTML='<label>'+f.lbl+'</label>';
       const inp=document.createElement('input');inp.id=f.id;inp.type=f.type;inp.value=f.val;inp.placeholder=f.ph;mf.appendChild(inp);grid.appendChild(mf);
     });
@@ -1435,7 +1491,25 @@ function renderModal(app){
     ICONS.forEach(ic=>{const o=document.createElement('option');o.value=ic;o.textContent=ic;if(ic===pp.icon)o.selected=true;icoSel.appendChild(o);});
     mfIco.appendChild(icoSel);grid.appendChild(mfIco);
 
-    // Variants
+    // Sale price section
+    const mfSale=document.createElement('div');mfSale.className='mf';mfSale.innerHTML='<label>Sale / discount %</label>';
+    const saleRow=document.createElement('div');saleRow.style.cssText='display:flex;align-items:center;gap:10px;flex-wrap:wrap';
+    const saleSel=document.createElement('select');saleSel.id='pSalePct';saleSel.style.cssText='padding:10px 12px;border-radius:10px;border:1.5px solid var(--b2);background:var(--bg2);color:var(--t1);font-size:15px;outline:none;flex:1';
+    const saleOpts=[{v:0,l:'No sale (regular price)'},...[5,10,15,20,25,30,40,50,60,70].map(p=>({v:p,l:p+'% off'}))];
+    saleOpts.forEach(o=>{const op=document.createElement('option');op.value=o.v;op.textContent=o.l;if((pp.salePct||0)===o.v)op.selected=true;saleSel.appendChild(op);});
+    const salePreview=document.createElement('div');salePreview.style.cssText='font-size:13px;color:var(--df);font-weight:700;flex-shrink:0';
+    function updateSalePreview(){
+      const basePrice=parseFloat(document.getElementById('pPr').value)||pp.price||0;
+      const pct=parseInt(saleSel.value)||0;
+      salePreview.textContent=pct>0?'→ '+fmt(+(basePrice*(1-pct/100)).toFixed(2)):'';
+    }
+    saleSel.onchange=updateSalePreview;
+    // also update when price changes
+    setTimeout(()=>{const prInp=document.getElementById('pPr');if(prInp)prInp.addEventListener('input',updateSalePreview);},50);
+    updateSalePreview();
+    saleRow.appendChild(saleSel);saleRow.appendChild(salePreview);mfSale.appendChild(saleRow);grid.appendChild(mfSale);
+
+
     const mfVar=document.createElement('div');mfVar.className='mf';mfVar.innerHTML='<label>Variants (size/color) — optional</label>';
     let variants=(pp.variants||[]).map(v=>({...v}));
     const varList=document.createElement('div');varList.style.cssText='display:flex;flex-direction:column;gap:6px';
@@ -1466,9 +1540,10 @@ function renderModal(app){
       const sv=document.getElementById('pSt').value.trim();const stock=sv===''?999:parseInt(sv)||0;
       const cat=document.getElementById('pCt').value.trim()||'General';const icon=document.getElementById('pIc').value;
       if(!name){toast('Enter a product name');return;}
+      const salePct=parseInt(document.getElementById('pSalePct').value)||0;
       const cleanVariants=variants.filter(v=>(v.label||'').trim());
-      if(p){const idx=S.prods.findIndex(x=>x.id===p.id);if(idx>-1)S.prods[idx]={id:p.id,name,price,cat,icon,stock,variants:cleanVariants,img:pendingImg};}
-      else S.prods.push({id:S.nid++,name,price,cat,icon,stock,variants:cleanVariants,img:pendingImg});
+      if(p){const idx=S.prods.findIndex(x=>x.id===p.id);if(idx>-1)S.prods[idx]={id:p.id,name,price,cat,icon,stock,variants:cleanVariants,img:pendingImg,salePct};}
+      else S.prods.push({id:S.nid++,name,price,cat,icon,stock,variants:cleanVariants,img:pendingImg,salePct});
       const cs=[...new Set(S.prods.map(x=>x.cat))];S.cats=['All',...cs];
       save();closeModal();toast(p?'Updated':'Added');
     };
