@@ -836,7 +836,22 @@ function renderCashierLogin(app){
   const list=document.createElement('div');list.style.cssText='width:100%;max-width:320px;display:flex;flex-direction:column;gap:8px';
   S.cashiers.forEach(c=>{
     const btn=document.createElement('button');btn.style.cssText='width:100%;padding:16px;border-radius:14px;border:1.5px solid var(--b2);background:var(--bg2);color:var(--t1);font-size:16px;font-weight:600;cursor:pointer;text-align:left';
-    btn.textContent=c.name;btn.onclick=function(){S.activeCashier=c;S.shiftStart=new Date().toISOString();S.alertDismissed=false;save();toast('Welcome, '+c.name+'!');render();};
+    btn.textContent=c.name;btn.onclick=async function(){
+      S.activeCashier=c;S.shiftStart=new Date().toISOString();S.alertDismissed=false;save();
+      // Clock in to Supabase attendance
+      if(CLOUD.token&&CLOUD.bizId){
+        try{
+          const today=new Date().toISOString().slice(0,10);
+          const h2={...H,'Authorization':'Bearer '+CLOUD.token,'Prefer':'return=representation'};
+          // Find employee record by name
+          const empRes=await fetch(SUPA_URL+'/rest/v1/employees?biz_id=eq.'+CLOUD.bizId+'&name=eq.'+encodeURIComponent(c.name),{headers:h2});
+          const empData=await empRes.json();
+          const empId=empData&&empData[0]?empData[0].id:null;
+          await fetch(SUPA_URL+'/rest/v1/attendance',{method:'POST',headers:h2,body:JSON.stringify({biz_id:CLOUD.bizId,employee_id:empId,employee_name:c.name,time_in:new Date().toISOString(),date:today})});
+        }catch(e){}
+      }
+      toast('Welcome, '+c.name+'! Clocked in.');render();
+    };
     list.appendChild(btn);
   });
   w.appendChild(list);
@@ -890,7 +905,26 @@ function renderTopNav(app){
 
   if(S.activeCashier){
     const cb=document.createElement('span');cb.className='cashier-badge';cb.textContent=S.activeCashier.name;cb.title='Tap to end shift';
-    cb.onclick=function(){if(confirm('End shift for '+S.activeCashier.name+'?')){S.activeCashier=null;S.shiftStart=null;save();render();}};
+    cb.onclick=async function(){
+      if(confirm('End shift for '+S.activeCashier.name+'?')){
+        // Clock out in Supabase
+        if(CLOUD.token&&CLOUD.bizId){
+          try{
+            const today=new Date().toISOString().slice(0,10);
+            const h2={...H,'Authorization':'Bearer '+CLOUD.token};
+            const attRes=await fetch(SUPA_URL+'/rest/v1/attendance?biz_id=eq.'+CLOUD.bizId+'&employee_name=eq.'+encodeURIComponent(S.activeCashier.name)+'&date=eq.'+today+'&time_out=is.null&order=time_in.desc&limit=1',{headers:h2});
+            const attData=await attRes.json();
+            if(attData&&attData[0]){
+              const timeIn=new Date(attData[0].time_in);
+              const timeOut=new Date();
+              const hrs=Math.round((timeOut-timeIn)/36000)/100;
+              await fetch(SUPA_URL+'/rest/v1/attendance?id=eq.'+attData[0].id,{method:'PATCH',headers:{...h2,'Prefer':'return=representation'},body:JSON.stringify({time_out:timeOut.toISOString(),hours_worked:hrs})});
+            }
+          }catch(e){}
+        }
+        S.activeCashier=null;S.shiftStart=null;save();render();
+      }
+    };
     brand.appendChild(cb);
   }
   nav.appendChild(brand);
