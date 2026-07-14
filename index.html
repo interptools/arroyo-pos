@@ -254,6 +254,39 @@ input,select,textarea{user-select:text;-webkit-user-select:text}
 .utang-label{font-size:14px;font-weight:600;color:var(--wt)}
 
 .toasts{position:absolute;top:10px;left:50%;transform:translateX(-50%);display:flex;flex-direction:column;gap:6px;pointer-events:none;z-index:300;width:90%;max-width:320px}
+.wiz{position:fixed;inset:0;background:var(--bg0);z-index:800;display:flex;flex-direction:column;overflow-y:auto}
+.wiz-header{padding:20px 20px 0;display:flex;align-items:center;justify-content:space-between}
+.wiz-logo{font-size:13px;font-weight:800;color:var(--ac)}
+.wiz-step-ind{font-size:11px;color:var(--t3)}
+.wiz-progress{height:3px;background:var(--b1);margin:12px 0 0}
+.wiz-progress-fill{height:100%;background:var(--ac);transition:width .4s}
+.wiz-body{flex:1;padding:24px 20px;display:flex;flex-direction:column;gap:14px}
+.wiz-title{font-size:22px;font-weight:800;line-height:1.2}
+.wiz-sub{font-size:14px;color:var(--t2);line-height:1.6;margin-top:-6px}
+.wiz-inp{padding:14px;border-radius:12px;border:1.5px solid var(--b2);background:var(--bg2);color:var(--t1);font-size:16px;outline:none;width:100%}
+.wiz-inp:focus{border-color:var(--ac)}
+.wiz-biz-grid{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+.wiz-biz-card{padding:14px;border-radius:12px;border:1.5px solid var(--b2);background:var(--bg2);cursor:pointer;text-align:center;transition:all .2s}
+.wiz-biz-card:hover,.wiz-biz-card.sel{border-color:var(--ac);background:rgba(55,138,221,0.1)}
+.wiz-biz-ico{font-size:26px;margin-bottom:5px}
+.wiz-biz-lbl{font-size:12px;font-weight:600}
+.wiz-prod-list{display:flex;flex-direction:column;gap:8px}
+.wiz-prod{display:flex;align-items:center;gap:12px;padding:12px;background:var(--bg2);border-radius:10px;border:1.5px solid transparent;cursor:pointer;transition:all .2s}
+.wiz-prod.sel{border-color:var(--ac);background:rgba(55,138,221,0.08)}
+.wiz-prod-check{width:20px;height:20px;border-radius:50%;border:2px solid var(--b2);flex-shrink:0;display:flex;align-items:center;justify-content:center;font-size:10px;transition:all .2s}
+.wiz-prod.sel .wiz-prod-check{background:var(--ac);border-color:var(--ac);color:#fff}
+.wiz-prod-info{flex:1}
+.wiz-prod-name{font-size:14px;font-weight:600}
+.wiz-prod-cat{font-size:11px;color:var(--t3);margin-top:2px}
+.wiz-prod-price{font-size:13px;font-weight:700;color:var(--ac)}
+.wiz-foot{padding:14px 20px calc(14px + env(safe-area-inset-bottom));display:flex;gap:10px;border-top:1px solid var(--b1);background:var(--bg1);flex-shrink:0}
+.wiz-btn{flex:1;padding:14px;border-radius:12px;border:none;font-size:15px;font-weight:700;cursor:pointer}
+.wiz-btn-sec{background:var(--bg2);color:var(--t1);border:1px solid var(--b2)}
+.wiz-btn-pri{background:var(--ac);color:#fff}
+.wiz-done{display:flex;flex-direction:column;align-items:center;justify-content:center;flex:1;text-align:center;gap:12px;padding:32px}
+.wiz-done-ico{font-size:64px}
+.wiz-done-title{font-size:24px;font-weight:800}
+.wiz-done-sub{font-size:14px;color:var(--t2);line-height:1.7;max-width:300px}
 .toast{background:var(--bg3);color:var(--t1);padding:10px 16px;border-radius:20px;font-size:13px;font-weight:600;text-align:center;border:1px solid var(--b2);box-shadow:0 4px 16px rgba(0,0,0,0.3)}
 
 /* Cloud auth screen */
@@ -539,7 +572,7 @@ const DP={
 const ICONS=['ITEM','FOOD','CAFE','SHRT','SCSR','PILL','GROC','ELEC','STOR','FRYS','DRNK','BOWL','BROD','CAKE','JKTS','CAPS','BAGS','HAIR','NAIL','FACE','EGGS','MILK','PLUG','HDPH','BATR','MOB','MEDS','RICE','FISH','MEAT'];
 
 let S={
-  screen:'biz',biz:null,bizName:'',prods:[],cats:[],installed:false,
+  screen:'biz',biz:null,bizName:'',prods:[],cats:[],installed:false,wizardDone:false,
   cart:[],cat:'All',search:'',disc:0,discType:'%',
   pass:'1234',locked:true,nid:10,sales:[],salesTotal:0,
   modal:null,histFilter:'all',cashTendered:0,
@@ -560,6 +593,7 @@ function load(){
   try{
     const d=JSON.parse(localStorage.getItem('arroyo_pos')||'{}');
     if(d.installed)S.installed=true;
+    if(d.wizardDone)S.wizardDone=true;
     if(d.biz){
       Object.assign(S,{
         biz:d.biz,bizName:d.bizName,prods:d.prods||[],cats:d.cats||[],
@@ -588,7 +622,7 @@ function save(){
     localStorage.setItem('arroyo_pos',JSON.stringify({
       biz:S.biz,bizName:S.bizName,prods:S.prods,cats:S.cats,
       pass:S.pass,nid:S.nid,sales:S.sales,salesTotal:S.salesTotal,
-      themeColor:S.themeColor,requireRef:S.requireRef,installed:S.installed,
+      themeColor:S.themeColor,requireRef:S.requireRef,installed:S.installed,wizardDone:S.wizardDone,
       bizLogo:S.bizLogo,dailyGoal:S.dailyGoal,
       expenses:S.expenses,expenseNid:S.expenseNid,
       cashiers:S.cashiers,cashierNid:S.cashierNid,
@@ -720,6 +754,7 @@ function render(){
   if(!CLOUD.token){renderCloudAuth(app);if(S.modal)renderModal(app);return;}
 
   if(S.screen==='biz'){renderBiz(app);return;}
+  if(S.screen==='wizard'){renderWizard(app);return;}
 
   // Cashier gate
   if(S.cashiers.length>0&&!S.activeCashier&&S.screen!=='admin'){
@@ -809,6 +844,153 @@ function renderInstall(app){
   setTimeout(function(){inp.focus();},100);
 }
 
+// WIZARD STATE
+let WIZ={step:1,bizType:null,bizName:'',selectedProds:[],cashierName:''};
+const TOTAL_STEPS=4;
+
+const WIZ_BIZ=[
+  {id:'cafe',lbl:'Cafe',ico:'☕'},
+  {id:'food',lbl:'Restaurant',ico:'🍽️'},
+  {id:'retail',lbl:'Clothing',ico:'👕'},
+  {id:'salon',lbl:'Salon',ico:'✂️'},
+  {id:'grocery',lbl:'Grocery',ico:'🛒'},
+  {id:'pharmacy',lbl:'Pharmacy',ico:'💊'},
+  {id:'electronics',lbl:'Electronics',ico:'📱'},
+  {id:'custom',lbl:'Other',ico:'🏪'},
+];
+
+function renderWizard(app){
+  const w=document.createElement('div');w.className='wiz';
+
+  // Header
+  const hdr=document.createElement('div');hdr.className='wiz-header';
+  hdr.innerHTML='<div class="wiz-logo">Arroyo POS</div><div class="wiz-step-ind">'+WIZ.step+' of '+TOTAL_STEPS+'</div>';
+  w.appendChild(hdr);
+
+  // Progress bar
+  const prog=document.createElement('div');prog.className='wiz-progress';
+  const fill=document.createElement('div');fill.className='wiz-progress-fill';fill.style.width=Math.round(WIZ.step/TOTAL_STEPS*100)+'%';
+  prog.appendChild(fill);w.appendChild(prog);
+
+  // Body
+  const body=document.createElement('div');body.className='wiz-body';
+
+  if(WIZ.step===1){
+    // Step 1: Business name
+    body.innerHTML='<div class="wiz-title">Welcome! 👋<br>Let\'s set up your business</div><div class="wiz-sub">First, what\'s your business name?</div>';
+    const inp=document.createElement('input');inp.className='wiz-inp';inp.placeholder='e.g. Reyes Cafe';inp.value=WIZ.bizName||S.cloudBizName||S.bizName||'';inp.id='wizBizName';
+    inp.oninput=function(){WIZ.bizName=this.value;};
+    body.appendChild(inp);
+    const hint=document.createElement('div');hint.style.cssText='font-size:12px;color:var(--t3);line-height:1.6';
+    hint.textContent='This will appear on receipts and the cashier screen.';body.appendChild(hint);
+
+  } else if(WIZ.step===2){
+    // Step 2: Business type
+    body.innerHTML='<div class="wiz-title">What kind of business?</div><div class="wiz-sub">We\'ll add sample products to get you started fast.</div>';
+    const grid=document.createElement('div');grid.className='wiz-biz-grid';
+    WIZ_BIZ.forEach(function(b){
+      const card=document.createElement('div');card.className='wiz-biz-card'+(WIZ.bizType===b.id?' sel':'');
+      card.innerHTML='<div class="wiz-biz-ico">'+b.ico+'</div><div class="wiz-biz-lbl">'+b.lbl+'</div>';
+      card.onclick=function(){WIZ.bizType=b.id;WIZ.selectedProds=DP[b.id]?DP[b.id].map(function(p){return p.id;}):[];grid.querySelectorAll('.wiz-biz-card').forEach(function(c){c.classList.remove('sel');});this.classList.add('sel');};
+      grid.appendChild(card);
+    });
+    body.appendChild(grid);
+
+  } else if(WIZ.step===3){
+    // Step 3: Select sample products
+    const prods=DP[WIZ.bizType]||DP.custom||[];
+    if(!WIZ.selectedProds.length)WIZ.selectedProds=prods.map(function(p){return p.id;});
+    body.innerHTML='<div class="wiz-title">Choose your starter products</div><div class="wiz-sub">These are sample products — you can edit prices, add more, or delete anytime.</div>';
+    const list=document.createElement('div');list.className='wiz-prod-list';
+    prods.forEach(function(p){
+      const isSel=WIZ.selectedProds.includes(p.id);
+      const item=document.createElement('div');item.className='wiz-prod'+(isSel?' sel':'');
+      item.innerHTML='<div class="wiz-prod-check">'+(isSel?'✓':'')+'</div><div class="wiz-prod-info"><div class="wiz-prod-name">'+p.name+'</div><div class="wiz-prod-cat">'+p.cat+'</div></div><div class="wiz-prod-price">PHP '+p.price+'</div>';
+      item.onclick=function(){
+        if(WIZ.selectedProds.includes(p.id)){WIZ.selectedProds=WIZ.selectedProds.filter(function(x){return x!==p.id;});}
+        else{WIZ.selectedProds.push(p.id);}
+        renderWizardRefresh(app);
+      };
+      list.appendChild(item);
+    });
+    body.appendChild(list);
+    const addNote=document.createElement('div');addNote.style.cssText='font-size:12px;color:var(--t3);text-align:center;padding:8px 0';addNote.textContent='You can add more products anytime in the Inventory tab';body.appendChild(addNote);
+
+  } else if(WIZ.step===4){
+    // Step 4: Done!
+    const done=document.createElement('div');done.className='wiz-done';
+    // Count selected products
+    const prods=DP[WIZ.bizType]||[];
+    const selProds=prods.filter(function(p){return WIZ.selectedProds.includes(p.id);});
+    done.innerHTML='<div class="wiz-done-ico">🎉</div><div class="wiz-done-title">You\'re all set,<br>'+WIZ.bizName+'!</div><div class="wiz-done-sub">'+selProds.length+' sample products added to your inventory.<br>You can now start selling, add your own products, and invite your cashiers.</div>';
+
+    const tips=document.createElement('div');tips.style.cssText='width:100%;display:flex;flex-direction:column;gap:8px;margin-top:8px';
+    [{ico:'📦',txt:'Add more products in Inventory tab'},{ico:'👥',txt:'Add employees in your Dashboard'},{ico:'⚙️',txt:'Set up your shop settings in Admin tab'},{ico:'🏷️',txt:'Edit prices anytime by tapping a product'}].forEach(function(tip){
+      const t=document.createElement('div');t.style.cssText='display:flex;gap:10px;align-items:center;padding:10px 12px;background:var(--bg2);border-radius:10px;font-size:13px;color:var(--t2)';
+      t.innerHTML='<span style="font-size:18px">'+tip.ico+'</span>'+tip.txt;tips.appendChild(t);
+    });
+    done.appendChild(tips);
+    body.appendChild(done);
+  }
+
+  w.appendChild(body);
+
+  // Footer buttons
+  const foot=document.createElement('div');foot.className='wiz-foot';
+
+  if(WIZ.step>1&&WIZ.step<4){
+    const back=document.createElement('button');back.className='wiz-btn wiz-btn-sec';back.textContent='← Back';
+    back.onclick=function(){WIZ.step--;renderWizardRefresh(app);};
+    foot.appendChild(back);
+  }
+
+  const next=document.createElement('button');next.className='wiz-btn wiz-btn-pri';
+  if(WIZ.step===4){next.textContent='Start selling →';}
+  else if(WIZ.step===3){next.textContent='Almost done →';}
+  else{next.textContent='Continue →';}
+
+  next.onclick=async function(){
+    if(WIZ.step===1){
+      const val=(document.getElementById('wizBizName')||{}).value||WIZ.bizName;
+      if(!val.trim()){toast('Enter your business name');return;}
+      WIZ.bizName=val.trim();
+      WIZ.step=2;renderWizardRefresh(app);
+    } else if(WIZ.step===2){
+      if(!WIZ.bizType){toast('Select your business type');return;}
+      WIZ.step=3;renderWizardRefresh(app);
+    } else if(WIZ.step===3){
+      WIZ.step=4;renderWizardRefresh(app);
+    } else if(WIZ.step===4){
+      // Apply wizard settings
+      const bizTypeObj=BT.find(function(b){return b.id===WIZ.bizType;})||BT[BT.length-1];
+      S.bizName=WIZ.bizName;S.biz=WIZ.bizType;S.installed=true;S.wizardDone=true;
+      // Load only selected sample products
+      const allProds=DP[WIZ.bizType]||[];
+      const selProds=allProds.filter(function(p){return WIZ.selectedProds.includes(p.id);});
+      S.prods=JSON.parse(JSON.stringify(selProds));
+      const cs=[...new Set(S.prods.map(function(p){return p.cat;}))];
+      S.cats=['All',...cs];S.nid=S.prods.length+1;
+      // Sync biz to cloud if connected
+      if(CLOUD.token&&CLOUD.user){
+        try{
+          await fetch(SUPA_URL+'/rest/v1/businesses',{method:'POST',headers:{...H,'Prefer':'return=representation'},body:JSON.stringify({user_id:CLOUD.user,name:WIZ.bizName,biz_type:WIZ.bizType})});
+          const bizRes=await fetch(SUPA_URL+'/rest/v1/businesses?user_id=eq.'+CLOUD.user,{headers:H});
+          const bizData=await bizRes.json();
+          if(bizData&&bizData[0])CLOUD.bizId=bizData[0].id;
+        }catch(e){}
+      }
+      S.screen='pos';save();render();toast('Welcome to '+S.bizName+'! 🎉');
+    }
+  };
+  foot.appendChild(next);
+  w.appendChild(foot);
+  app.appendChild(w);
+}
+
+function renderWizardRefresh(app){
+  app.innerHTML='';renderWizard(app);
+}
+
 function renderBiz(app){
   const w=document.createElement('div');w.className='biz-screen';
   w.innerHTML='<div class="biz-logo">'+CR.app+'</div>'
@@ -877,7 +1059,7 @@ function renderCloudAuth(app){
       const bizData=await bizRes.json();
       if(bizData&&bizData.length>0){CLOUD.bizId=bizData[0].id;S.cloudBizName=bizData[0].name;S.bizName=bizData[0].name;S.biz=bizData[0].biz_type||'custom';S.installed=true;}
       save();await loadCloudData();
-      if(!S.biz){S.screen='biz';}else{S.screen='pos';}
+      if(!S.biz){S.screen='wizard';}else{S.screen='pos';}
       render();
     } else {
       const res=await signUp(email,pass,bizName);
