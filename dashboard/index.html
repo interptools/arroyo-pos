@@ -119,7 +119,7 @@ html,body{min-height:100%;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI
 const SB_URL='https://btfazallxcbmiitbcmkv.supabase.co';
 const SB_KEY='eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImJ0ZmF6YWxseGNibWlpdGJjbWt2Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODM5NjkwODIsImV4cCI6MjA5OTU0NTA4Mn0.Iu0qjlPttxxqY_LcvTND9Uir3uy71FCv469NjlfiIBE';
 let SESSION={token:null,user:null,bizId:null,bizName:'',email:''};
-let D={sales:[],expenses:[],products:[],employees:[],attendance:[],customers:[],credit:[],suppliers:[],pos:[],ingredients:[],wastage:[],orders:[],loans:[],leaves:[]};
+let D={sales:[],expenses:[],products:[],employees:[],attendance:[],customers:[],credit:[],suppliers:[],pos:[],ingredients:[],recipes:[],wastage:[],orders:[],loans:[],leaves:[]};
 let UI={page:'overview',filter:'week',modal:null,loading:false};
 let CHARTS={};
 
@@ -159,12 +159,13 @@ async function loadData(){
     api('/rest/v1/suppliers?biz_id=eq.'+bid+'&order=name'),
     api('/rest/v1/purchase_orders?biz_id=eq.'+bid+'&order=date.desc&limit=200'),
     api('/rest/v1/ingredients?biz_id=eq.'+bid+'&order=name'),
+    api('/rest/v1/recipes?biz_id=eq.'+bid),
     api('/rest/v1/wastage?biz_id=eq.'+bid+'&order=date.desc&limit=200'),
     api('/rest/v1/orders?biz_id=eq.'+bid+'&order=created_at.desc&limit=200'),
     api('/rest/v1/employee_loans?biz_id=eq.'+bid+'&order=date.desc'),
     api('/rest/v1/leaves?biz_id=eq.'+bid+'&order=created_at.desc'),
   ]);
-  const keys=['sales','expenses','products','employees','attendance','customers','credit','suppliers','pos','ingredients','wastage','orders','loans','leaves'];
+  const keys=['sales','expenses','products','employees','attendance','customers','credit','suppliers','pos','ingredients','recipes','wastage','orders','loans','leaves'];
   keys.forEach(function(k,i){D[k]=Array.isArray(results[i])?results[i]:[];});
   UI.loading=false;render();
 }
@@ -304,7 +305,8 @@ function renderApp(root){
   navItem('reports','ti-chart-bar','Reports');
   navSection('Operations');
   navItem('inventory','ti-box','Inventory');
-  navItem('ingredients','ti-salad','Ingredients');
+  navItem('ingredients','ti-salad','Ingredients'+(D.ingredients.filter(function(i){return i.stock<=i.low_threshold;}).length>0?' ⚠':''));
+  navItem('recipes','ti-book','Recipes');
   navItem('wastage','ti-trash','Wastage');
   navItem('orders','ti-shopping-cart','Orders');
   navSection('Finance');
@@ -334,6 +336,7 @@ function renderApp(root){
   else if(UI.page==='customers'){renderCustomers(main);}
   else if(UI.page==='suppliers'){renderSuppliers(main);}
   else if(UI.page==='ingredients'){renderIngredients(main);}
+  else if(UI.page==='recipes'){renderRecipes(main);}
   else if(UI.page==='orders'){renderOrders(main);}
   else if(UI.page==='wastage'){renderWastage(main,rev);}
   else if(UI.page==='reports'){renderReports(main,fs,rev,exp,net);}
@@ -343,6 +346,15 @@ function renderApp(root){
 
 function renderOverview(main,fs,fe,rev,exp,net){
   main.appendChild(el('div','page-title','Overview'));
+  // Low stock alert banner
+  const lowItems=D.ingredients.filter(function(i){return i.stock<=i.low_threshold;});
+  if(lowItems.length>0){
+    const alert=el('div','');
+    alert.style.cssText='background:var(--dg);border:1px solid var(--dt);border-radius:10px;padding:12px 16px;margin-bottom:16px;display:flex;align-items:center;gap:10px;cursor:pointer';
+    alert.innerHTML='<i class="ti ti-alert-triangle" style="font-size:18px;color:var(--dt);flex-shrink:0" aria-hidden="true"></i><div><div style="font-weight:700;color:var(--dt)">'+lowItems.length+' ingredient'+(lowItems.length>1?'s':'')+' running low</div><div style="font-size:12px;color:var(--t2);margin-top:2px">'+lowItems.map(function(i){return i.name+' ('+i.stock+' '+i.unit+' left)';}).join(' · ')+'</div></div>';
+    alert.onclick=function(){UI.page='ingredients';render();};
+    main.appendChild(alert);
+  }
   main.appendChild(filterBar());
   const sg=el('div','stats-grid');
   sg.appendChild(statCard('Revenue',fmt(rev),fs.length+' transactions','blue'));
@@ -598,6 +610,44 @@ function renderSuppliers(main){
   two.appendChild(poc);main.appendChild(two);
 }
 
+function renderRecipes(main){
+  main.appendChild(el('div','page-title','Recipes'));
+  const sg=el('div','stats-grid');
+  const prodWithRecipe=new Set(D.recipes.map(function(r){return r.product_name;})).size;
+  sg.appendChild(statCard('Products',D.products.length,'total',''));
+  sg.appendChild(statCard('With recipes',prodWithRecipe,'linked to ingredients','blue'));
+  sg.appendChild(statCard('Without recipes',D.products.length-prodWithRecipe,'no ingredients set','amber'));
+  main.appendChild(sg);
+
+  const note=el('div','',);note.style.cssText='font-size:13px;color:var(--t2);margin-bottom:16px;padding:12px 14px;background:var(--bg2);border-radius:10px;line-height:1.6';
+  note.textContent='Set up ingredients per product here. When a product is sold on the POS, its ingredients are automatically deducted from stock.';
+  main.appendChild(note);
+
+  D.products.forEach(function(p){
+    const prodRecipes=D.recipes.filter(function(r){return r.product_name===p.name;});
+    const card=el('div','card');
+    const hd=el('div','card-hd');
+    hd.innerHTML='<div><div style="font-size:15px;font-weight:700">'+p.name+'</div><div style="font-size:12px;color:var(--t3)">'+p.cat+' · '+fmt(p.price)+'</div></div>';
+    const addIngBtn=addBtn('+ Add ingredient',function(){UI.modal={type:'recipe',product:p,item:null};render();});
+    hd.appendChild(addIngBtn);card.appendChild(hd);
+
+    if(!prodRecipes.length){
+      const empty=el('div','','No ingredients set — add ingredients to enable auto stock deduction');
+      empty.style.cssText='font-size:12px;color:var(--t3);padding:8px 0';
+      card.appendChild(empty);
+    } else {
+      prodRecipes.forEach(function(r){
+        const ing=D.ingredients.find(function(i){return i.id===r.ingredient_id;});
+        const row=el('div','row');
+        row.innerHTML='<div class="row-l"><div class="row-name">'+r.ingredient_name+'</div><div class="row-sub">'+(ing?'Current stock: '+ing.stock+' '+ing.unit:'Ingredient not found')+'</div></div><div class="row-r"><span style="font-size:14px;font-weight:700;color:var(--ac)">'+r.qty_used+' '+(ing?ing.unit:'units')+' per sale</span><button class="sm-btn" onclick="UI.modal={type:\'recipe\',product:D.products.find(function(x){return x.id===\''+p.id+'\'}),item:D.recipes.find(function(x){return x.id===\''+r.id+'\'})};render()">Edit</button><button class="sm-btn" style="color:var(--dt)" onclick="api(\'/rest/v1/recipes?id=eq.'+r.id+'\',{method:\'DELETE\'}).then(loadData)">Remove</button></div>';
+        card.appendChild(row);
+      });
+    }
+    main.appendChild(card);
+  });
+  if(!D.products.length)main.appendChild(el('div','empty','No products found — add products in the POS app first'));
+}
+
 function renderIngredients(main){
   main.appendChild(el('div','page-title','Ingredients'));
   const low=D.ingredients.filter(function(i){return i.stock<=i.low_threshold;}).length;
@@ -839,6 +889,46 @@ function renderModal(root){
       await api('/rest/v1/purchase_orders',{method:'POST',headers:{'Prefer':'return=representation'},body:JSON.stringify({biz_id:SESSION.bizId,supplier_id:sid,supplier_name:sname,total:parseFloat(gv('poTotal'))||0,status:gv('poStatus'),notes:gv('poNotes'),date:new Date().toISOString()})});
       UI.modal=null;await loadData();
     },'Create PO');
+
+  } else if(m.type==='recipe'){
+    const p=m.product;const r=m.item||{};const isNew=!m.item;
+    box.appendChild(el('div','modal-title',(isNew?'Add ingredient to ':'Edit ingredient for ')+p.name));
+    // Show current stock summary
+    if(D.ingredients.length===0){
+      box.appendChild(el('div','',`<div style="color:var(--wt);font-size:13px;padding:8px 0">No ingredients found. Add ingredients in the Ingredients tab first.</div>`));
+    }
+    // Ingredient selector
+    const ifld=el('div','mf','<label>Ingredient</label>');
+    const isel=document.createElement('select');isel.id='rIng';
+    D.ingredients.forEach(function(ing){
+      const op=document.createElement('option');op.value=ing.id+'|'+ing.name+'|'+ing.unit;op.textContent=ing.name+' ('+ing.stock+' '+ing.unit+' in stock)';
+      if(r.ingredient_id===ing.id)op.selected=true;isel.appendChild(op);
+    });
+    ifld.appendChild(isel);box.appendChild(ifld);
+    // Quantity
+    mfField(box,'rQty','Quantity used per sale','number',r.qty_used||1,'e.g. 1');
+    // Unit hint
+    const hint=el('div','');hint.id='rHint';hint.style.cssText='font-size:12px;color:var(--t3);margin-top:-8px';
+    box.appendChild(hint);
+    isel.onchange=function(){
+      const parts=this.value.split('|');
+      hint.textContent='Unit: '+(parts[2]||'');
+    };
+    if(D.ingredients.length>0){
+      const parts=isel.value.split('|');
+      hint.textContent='Unit: '+(parts[2]||'');
+    }
+    modalBtns(box,function(){UI.modal=null;render();},async function(){
+      const ingVal=gv('rIng');const qty=parseFloat(gv('rQty'))||1;
+      if(!ingVal){alert('Select an ingredient');return;}
+      const[ingId,ingName,ingUnit]=ingVal.split('|');
+      if(isNew){
+        await api('/rest/v1/recipes',{method:'POST',headers:{'Prefer':'return=representation'},body:JSON.stringify({biz_id:SESSION.bizId,product_name:p.name,ingredient_id:ingId,ingredient_name:ingName,qty_used:qty})});
+      } else {
+        await api('/rest/v1/recipes?id=eq.'+r.id,{method:'PATCH',body:JSON.stringify({ingredient_id:ingId,ingredient_name:ingName,qty_used:qty})});
+      }
+      UI.modal=null;await loadData();
+    },isNew?'Add':'Save');
 
   } else if(m.type==='ingredient'){
     const it=m.item||{};const isNew=!m.item;
