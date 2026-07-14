@@ -819,9 +819,13 @@ function renderModal(root){
   const box=el('div','modal');
   function close(){UI.modal=null;render();}
   function save(table,payload,id){
-    if(id){api('/rest/v1/'+table+'?id=eq.'+id,{method:'PATCH',body:JSON.stringify(payload)}).then(loadData);}
-    else{api('/rest/v1/'+table,{method:'POST',headers:{'Prefer':'return=representation'},body:JSON.stringify(payload)}).then(loadData);}
-    UI.modal=null;render();
+    const doSave=async function(){
+      if(id){await api('/rest/v1/'+table+'?id=eq.'+id,{method:'PATCH',body:JSON.stringify(payload)});}
+      else{await api('/rest/v1/'+table,{method:'POST',headers:{'Prefer':'return=representation'},body:JSON.stringify(payload)});}
+      UI.modal=null;
+      await loadData();
+    };
+    doSave();
   }
   function gv(id){return(document.getElementById(id)||{}).value||'';}
 
