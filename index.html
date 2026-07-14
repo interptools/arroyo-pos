@@ -503,6 +503,7 @@ async function loadCloudData(){
     save();toast('Cloud sync complete');
   }catch(e){toast('Sync error — using local data');}
   await loadCloudCustomers();
+  await loadAttEmployees();
 }
 async function saveProductsToCloud(){
   if(!CLOUD.token||!CLOUD.bizId)return;
@@ -552,6 +553,7 @@ let S={
   selectedCustomer:null,
   chargeToUtang:false,
   cloudCustomers:[],
+  cloudAttEmployees:[],
 };
 
 function load(){
@@ -736,6 +738,7 @@ function render(){
   else if(S.screen==='inv')renderInv(scr);
   else if(S.screen==='hist')renderHist(scr);
   else if(S.screen==='exp')renderExp(scr);
+  else if(S.screen==='att'){renderAtt(scr);}
   else if(S.screen==='admin'){S.locked?renderLock(scr):renderAdmin(scr);}
   else if(S.screen==='about')renderAbout(scr);
 
@@ -1006,6 +1009,7 @@ function renderTopNav(app){
     {id:'inv',lbl:'Inventory'},
     {id:'hist',lbl:'History'},
     {id:'exp',lbl:'Expenses'},
+    {id:'att',lbl:'Attendance'},
     {id:'admin',lbl:'Admin'},
     {id:'about',lbl:'About'},
   ].forEach(t=>{
@@ -1248,6 +1252,103 @@ function renderCart(scr){
   pg.appendChild(big);
   foot.appendChild(pg);
   scr.appendChild(foot);
+}
+
+function renderAtt(scr){
+  const hd=document.createElement('div');hd.className='panel-hd';
+  hd.innerHTML='<h2>Attendance</h2>';
+  scr.appendChild(hd);
+
+  // Load cloud employees for this business
+  const empList=S.cloudAttEmployees||[];
+
+  if(!CLOUD.token||!CLOUD.bizId){
+    const msg=document.createElement('div');msg.style.cssText='padding:28px;text-align:center;color:var(--t3);font-size:14px';msg.textContent='Sign in to cloud to use attendance tracking.';scr.appendChild(msg);return;
+  }
+
+  // Show current status of each employee
+  const statusCard=document.createElement('div');statusCard.className='card';statusCard.style.marginBottom='14px';
+  const stHd=document.createElement('div');stHd.style.cssText='font-size:13px;font-weight:700;color:var(--t3);text-transform:uppercase;letter-spacing:.4px;margin-bottom:12px';stHd.textContent='Today\'s status';
+  statusCard.appendChild(stHd);
+
+  if(!empList.length){
+    statusCard.appendChild(document.createTextNode('No employees found. Add employees in the dashboard first.'));
+  }
+  empList.forEach(function(e){
+    const row=document.createElement('div');row.style.cssText='display:flex;align-items:center;justify-content:space-between;padding:12px 0;border-bottom:1px solid var(--b1)';
+    const info=document.createElement('div');
+    const dot=document.createElement('span');dot.style.cssText='display:inline-block;width:8px;height:8px;border-radius:50%;margin-right:8px;background:'+(e.clockedIn?'var(--st)':'var(--t3)');
+    const name=document.createElement('span');name.style.cssText='font-size:15px;font-weight:600';name.textContent=e.name;
+    const sub=document.createElement('div');sub.style.cssText='font-size:12px;color:var(--t3);margin-top:3px;margin-left:16px';
+    sub.textContent=e.clockedIn?'Clocked in at '+e.timeIn:'Not clocked in';
+    info.appendChild(dot);info.appendChild(name);info.appendChild(sub);
+    const btn=document.createElement('button');
+    btn.style.cssText='padding:10px 18px;border-radius:10px;border:none;font-size:13px;font-weight:700;cursor:pointer;'+(e.clockedIn?'background:var(--dg);color:var(--dt)':'background:var(--sg);color:var(--st)');
+    btn.textContent=e.clockedIn?'Clock Out':'Clock In';
+    btn.onclick=async function(){
+      btn.disabled=true;btn.style.opacity='0.5';
+      const h2={...H,'Authorization':'Bearer '+CLOUD.token,'Prefer':'return=representation'};
+      const today=new Date().toISOString().slice(0,10);
+      if(e.clockedIn){
+        // Clock out
+        const attRes=await fetch(SUPA_URL+'/rest/v1/attendance?biz_id=eq.'+CLOUD.bizId+'&employee_id=eq.'+e.id+'&date=eq.'+today+'&time_out=is.null&order=time_in.desc&limit=1',{headers:h2});
+        const attData=await attRes.json();
+        if(attData&&attData[0]){
+          const timeIn=new Date(attData[0].time_in);const timeOut=new Date();
+          const hrs=Math.round((timeOut-timeIn)/36000)/100;
+          await fetch(SUPA_URL+'/rest/v1/attendance?id=eq.'+attData[0].id,{method:'PATCH',headers:h2,body:JSON.stringify({time_out:timeOut.toISOString(),hours_worked:hrs})});
+        }
+        e.clockedIn=false;e.timeIn='';
+        toast(e.name+' clocked out');
+      } else {
+        // Clock in
+        await fetch(SUPA_URL+'/rest/v1/attendance',{method:'POST',headers:h2,body:JSON.stringify({biz_id:CLOUD.bizId,employee_id:e.id,employee_name:e.name,time_in:new Date().toISOString(),date:today})});
+        e.clockedIn=true;e.timeIn=new Date().toLocaleTimeString([],{hour:'2-digit',minute:'2-digit'});
+        toast(e.name+' clocked in');
+      }
+      btn.disabled=false;btn.style.opacity='1';
+      btn.textContent=e.clockedIn?'Clock Out':'Clock In';
+      btn.style.background=e.clockedIn?'var(--dg)':'var(--sg)';
+      btn.style.color=e.clockedIn?'var(--dt)':'var(--st)';
+      sub.textContent=e.clockedIn?'Clocked in at '+e.timeIn:'Not clocked in';
+      dot.style.background=e.clockedIn?'var(--st)':'var(--t3)';
+    };
+    row.appendChild(info);row.appendChild(btn);statusCard.appendChild(row);
+  });
+  scr.appendChild(statusCard);
+
+  // Refresh button to reload employees
+  const refBtn=document.createElement('button');refBtn.className='abtn';refBtn.textContent='Refresh employees';
+  refBtn.onclick=async function(){
+    refBtn.textContent='Loading...';refBtn.disabled=true;
+    await loadAttEmployees();render();
+  };
+  scr.appendChild(refBtn);
+}
+
+async function loadAttEmployees(){
+  if(!CLOUD.token||!CLOUD.bizId)return;
+  try{
+    const h2={...H,'Authorization':'Bearer '+CLOUD.token};
+    const today=new Date().toISOString().slice(0,10);
+    // Load employees
+    const empRes=await fetch(SUPA_URL+'/rest/v1/employees?biz_id=eq.'+CLOUD.bizId+'&active=eq.true&order=name',{headers:h2});
+    const emps=await empRes.json();
+    if(!Array.isArray(emps))return;
+    // Load today's attendance
+    const attRes=await fetch(SUPA_URL+'/rest/v1/attendance?biz_id=eq.'+CLOUD.bizId+'&date=eq.'+today,{headers:h2});
+    const att=await attRes.json();
+    // Merge — mark who is clocked in (has time_in but no time_out today)
+    S.cloudAttEmployees=emps.map(function(e){
+      const todayAtt=Array.isArray(att)?att.filter(function(a){return a.employee_id===e.id&&!a.time_out;}):[];
+      const latest=todayAtt.length>0?todayAtt[todayAtt.length-1]:null;
+      return{
+        id:e.id,name:e.name,role:e.role,
+        clockedIn:!!latest,
+        timeIn:latest?new Date(latest.time_in).toLocaleTimeString([],{hour:'2-digit',minute:'2-digit'}):''
+      };
+    });
+  }catch(e){}
 }
 
 function renderInv(scr){
