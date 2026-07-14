@@ -158,6 +158,7 @@ input,select,textarea{user-select:text;-webkit-user-select:text}
 .mCash{background:var(--sg);color:var(--st)}
 .mCard{background:var(--ac2);color:var(--ac)}
 .mGCash{background:var(--pg);color:var(--pt)}
+.mUtang{background:var(--wg);color:var(--wt)}
 .mTransfer{background:var(--wg);color:var(--wt)}
 
 /* ADMIN */
@@ -240,7 +241,18 @@ input,select,textarea{user-select:text;-webkit-user-select:text}
 .confirm-btn:active{opacity:0.85}
 .confirm-btn.disabled{background:#444;opacity:0.6;pointer-events:none}
 
-/* TOAST */
+/* Customer selector on checkout */
+.cust-search{padding:0;margin-bottom:10px}
+.cust-search input{width:100%;padding:11px 14px;border-radius:10px;border:1.5px solid var(--b2);background:var(--bg2);color:var(--t1);font-size:14px;outline:none}
+.cust-results{display:flex;flex-direction:column;gap:4px;max-height:160px;overflow-y:auto;margin-top:6px}
+.cust-result{padding:10px 12px;border-radius:10px;background:var(--bg2);cursor:pointer;display:flex;align-items:center;justify-content:space-between;border:1.5px solid transparent}
+.cust-result:hover{border-color:var(--ac)}
+.cust-result.selected{border-color:var(--ac);background:var(--ac2)}
+.cust-name{font-size:14px;font-weight:600}
+.cust-bal{font-size:12px;color:var(--dt);font-weight:700}
+.utang-toggle{display:flex;align-items:center;justify-content:space-between;padding:10px 14px;background:var(--bg2);border-radius:10px;margin-bottom:8px;cursor:pointer}
+.utang-label{font-size:14px;font-weight:600;color:var(--wt)}
+
 .toasts{position:absolute;top:10px;left:50%;transform:translateX(-50%);display:flex;flex-direction:column;gap:6px;pointer-events:none;z-index:300;width:90%;max-width:320px}
 .toast{background:var(--bg3);color:var(--t1);padding:10px 16px;border-radius:20px;font-size:13px;font-weight:600;text-align:center;border:1px solid var(--b2);box-shadow:0 4px 16px rgba(0,0,0,0.3)}
 
@@ -414,6 +426,61 @@ async function syncExpenseToCloud(exp){
     })});
   }catch(e){}
 }
+async function loadCloudCustomers(){
+  if(!CLOUD.token||!CLOUD.bizId)return;
+  try{
+    const h2={...H,'Authorization':'Bearer '+CLOUD.token};
+    const r=await fetch(SUPA_URL+'/rest/v1/customers?biz_id=eq.'+CLOUD.bizId+'&order=name',{headers:h2});
+    const data=await r.json();
+    if(Array.isArray(data))S.cloudCustomers=data;
+  }catch(e){}
+}
+
+async function recordCustomerSale(tx){
+  if(!CLOUD.token||!CLOUD.bizId||!S.selectedCustomer)return;
+  try{
+    const h2={...H,'Authorization':'Bearer '+CLOUD.token,'Prefer':'return=representation'};
+    const cust=S.selectedCustomer;
+    if(S.chargeToUtang){
+      // Record credit charge
+      await fetch(SUPA_URL+'/rest/v1/credit_ledger',{method:'POST',headers:h2,body:JSON.stringify({biz_id:CLOUD.bizId,customer_id:cust.id,customer_name:cust.name,type:'charge',amount:tx.total,note:'Sale '+tx.id,txn_id:tx.id,date:new Date().toISOString()})});
+      await fetch(SUPA_URL+'/rest/v1/customers?id=eq.'+cust.id,{method:'PATCH',headers:h2,body:JSON.stringify({credit_balance:cust.credit_balance+tx.total})});
+    }
+    // Add loyalty points (1 point per PHP 10)
+    const pts=Math.floor(tx.total/10);
+    if(pts>0){
+      await fetch(SUPA_URL+'/rest/v1/customers?id=eq.'+cust.id,{method:'PATCH',headers:h2,body:JSON.stringify({points:(cust.points||0)+pts})});
+    }
+  }catch(e){}
+}
+
+async function deductIngredients(cartItems){
+  if(!CLOUD.token||!CLOUD.bizId)return;
+  try{
+    const h2={...H,'Authorization':'Bearer '+CLOUD.token};
+    // Get all recipes for products in this sale
+    const names=cartItems.map(i=>i.name);
+    const recipesRes=await fetch(SUPA_URL+'/rest/v1/recipes?biz_id=eq.'+CLOUD.bizId+'&product_name=in.('+names.map(n=>'"'+n+'"').join(',')+')',{headers:h2});
+    const recipes=await recipesRes.json();
+    if(!Array.isArray(recipes)||!recipes.length)return;
+    // Group deductions by ingredient
+    const deduct={};
+    cartItems.forEach(ci=>{
+      recipes.filter(r=>r.product_name===ci.name).forEach(r=>{
+        deduct[r.ingredient_id]=(deduct[r.ingredient_id]||0)+(r.qty_used*ci.qty);
+      });
+    });
+    // Apply deductions
+    for(const[ingId,qty] of Object.entries(deduct)){
+      const ingRes=await fetch(SUPA_URL+'/rest/v1/ingredients?id=eq.'+ingId,{headers:h2});
+      const ing=await ingRes.json();
+      if(ing&&ing[0]){
+        const newStock=Math.max(0,ing[0].stock-qty);
+        await fetch(SUPA_URL+'/rest/v1/ingredients?id=eq.'+ingId,{method:'PATCH',headers:{...h2,'Prefer':'return=representation'},body:JSON.stringify({stock:newStock})});
+      }
+    }
+  }catch(e){}
+}
 async function loadCloudData(){
   if(!CLOUD.token||!CLOUD.bizId)return;
   toast('Syncing from cloud...');
@@ -435,6 +502,7 @@ async function loadCloudData(){
     }
     save();toast('Cloud sync complete');
   }catch(e){toast('Sync error — using local data');}
+  await loadCloudCustomers();
 }
 async function saveProductsToCloud(){
   if(!CLOUD.token||!CLOUD.bizId)return;
@@ -481,6 +549,9 @@ let S={
   alertDismissed:false,
   cloudEmail:'',cloudBizName:'',
   authScreen:'login',
+  selectedCustomer:null,
+  chargeToUtang:false,
+  cloudCustomers:[],
 };
 
 function load(){
@@ -1126,6 +1197,42 @@ function renderCart(scr){
   ds.onchange=function(){S.discType=this.value;buildPreview(S.disc,S.discType);};
   di.onblur=function(){render();};
 
+  // Customer selector (only shows if cloud customers loaded)
+  if(S.cloudCustomers&&S.cloudCustomers.length>0){
+    const custSec=document.createElement('div');custSec.style.cssText='margin-bottom:10px;border-top:1px solid var(--b1);padding-top:10px';
+    const custLbl=document.createElement('div');custLbl.style.cssText='font-size:11px;font-weight:700;color:var(--t3);text-transform:uppercase;letter-spacing:.4px;margin-bottom:6px';custLbl.textContent='Customer (optional)';
+    custSec.appendChild(custLbl);
+    if(S.selectedCustomer){
+      const selected=document.createElement('div');selected.className='cust-result selected';
+      selected.innerHTML='<div><div class="cust-name">'+S.selectedCustomer.name+'</div><div style="font-size:11px;color:var(--ac)">'+S.selectedCustomer.points+' pts'+(S.selectedCustomer.credit_balance>0?' · Owes '+fmt(S.selectedCustomer.credit_balance):'')+'</div></div><button style="background:none;border:none;color:var(--t3);cursor:pointer;font-size:16px">×</button>';
+      selected.querySelector('button').onclick=function(){S.selectedCustomer=null;S.chargeToUtang=false;render();};
+      custSec.appendChild(selected);
+      // Utang toggle
+      const ut=document.createElement('div');ut.className='utang-toggle';
+      ut.innerHTML='<span class="utang-label">Charge to utang / credit</span><span style="font-size:12px;color:var(--t2)">'+(S.chargeToUtang?'YES — will not collect cash':'No — collect payment now')+'</span>';
+      ut.onclick=function(){S.chargeToUtang=!S.chargeToUtang;render();};
+      custSec.appendChild(ut);
+    } else {
+      const csearch=document.createElement('div');csearch.className='cust-search';
+      const cinp=document.createElement('input');cinp.placeholder='Search customer name...';cinp.id='custSearch';
+      cinp.oninput=function(){
+        const v=this.value.toLowerCase();const results=document.getElementById('custResults');
+        results.innerHTML='';
+        if(!v){return;}
+        S.cloudCustomers.filter(c=>c.name.toLowerCase().includes(v)).slice(0,5).forEach(c=>{
+          const item=document.createElement('div');item.className='cust-result';
+          item.innerHTML='<div><div class="cust-name">'+c.name+'</div><div style="font-size:11px;color:var(--t2)">'+(c.phone||'')+' · '+c.points+' pts</div></div>'+(c.credit_balance>0?'<span class="cust-bal">Owes '+fmt(c.credit_balance)+'</span>':'');
+          item.onclick=function(){S.selectedCustomer=c;S.chargeToUtang=false;render();};
+          results.appendChild(item);
+        });
+      };
+      csearch.appendChild(cinp);
+      const cres=document.createElement('div');cres.className='cust-results';cres.id='custResults';
+      csearch.appendChild(cres);custSec.appendChild(csearch);
+    }
+    foot.appendChild(custSec);
+  }
+
   const pg=document.createElement('div');pg.className='pay-grid';
   [
     {id:'Cash',lbl:'CASH'},
@@ -1151,7 +1258,9 @@ function renderInv(scr){
   hd.innerHTML='<h2>Inventory</h2>';
   const addb=document.createElement('button');addb.className='abtn';addb.textContent='+ Add';
   addb.onclick=function(){openModal({type:'prod',prod:null});};
-  hd.appendChild(addb);scr.appendChild(hd);
+  const wastBtn=document.createElement('button');wastBtn.className='abtn';wastBtn.style.cssText='color:var(--wt);border-color:var(--wg);font-size:12px;padding:7px 12px';wastBtn.textContent='Log wastage';
+  wastBtn.onclick=function(){openModal({type:'quickWastage'});};
+  hd.appendChild(wastBtn);hd.appendChild(addb);scr.appendChild(hd);
 
   const stats=document.createElement('div');stats.className='stats';
   [{l:'Items',v:S.prods.length,c:''},{l:'Low stock',v:lowCnt,c:'color:var(--wt)'},{l:'Out of stock',v:outCnt,c:'color:var(--dt)'}].forEach(s=>{
@@ -1592,12 +1701,16 @@ function renderModal(app){
       setTimeout(()=>cashInp.focus(),100);
 
       confirmBtn.onclick=function(){
-        if(S.cashTendered<tot())return;
+        if(S.cashTendered<tot()&&!S.chargeToUtang)return;
         const txid=txId();
-        const tx={id:txid,date:new Date().toISOString(),items:S.cart.map(i=>({name:i.name,qty:i.qty,price:i.price})),total:tot(),method:'Cash',receipt:receiptStr('Cash',txid)};
+        const payMethod=S.chargeToUtang?'Utang':'Cash';
+        const tx={id:txid,date:new Date().toISOString(),items:S.cart.map(i=>({name:i.name,qty:i.qty,price:i.price})),total:tot(),method:payMethod,receipt:receiptStr(payMethod,txid),customer:S.selectedCustomer?S.selectedCustomer.name:'',cashier:S.activeCashier?S.activeCashier.name:''};
         S.cart.forEach(ci=>{const p=S.prods.find(x=>x.id===ci.id);if(p&&p.stock!==999)p.stock=Math.max(0,p.stock-ci.qty);});
+        const cartCopy=[...S.cart];
         S.sales.push(tx);S.salesTotal+=tot();S.cart=[];S.disc=0;S.cashTendered=0;S.cartOpen=false;
-        save();syncSaleToCloud(tx);closeModal();toast('Sale recorded - '+txid);
+        S.selectedCustomer=null;S.chargeToUtang=false;
+        save();syncSaleToCloud(tx);recordCustomerSale(tx);deductIngredients(cartCopy);
+        closeModal();toast('Sale recorded - '+txid);
       };
 
     } else {
@@ -1638,10 +1751,13 @@ function renderModal(app){
           toast('Please enter reference number');return;
         }
         const txid=txId();const refNum=refInp?refInp.value.trim():'';
-        const tx={id:txid,date:new Date().toISOString(),items:S.cart.map(i=>({name:i.name,qty:i.qty,price:i.price})),total:tot(),method:m.method,ref:refNum,receipt:receiptStr(m.method,txid,refNum)};
+        const tx={id:txid,date:new Date().toISOString(),items:S.cart.map(i=>({name:i.name,qty:i.qty,price:i.price})),total:tot(),method:m.method,ref:refNum,receipt:receiptStr(m.method,txid,refNum),customer:S.selectedCustomer?S.selectedCustomer.name:'',cashier:S.activeCashier?S.activeCashier.name:''};
         S.cart.forEach(ci=>{const p=S.prods.find(x=>x.id===ci.id);if(p&&p.stock!==999)p.stock=Math.max(0,p.stock-ci.qty);});
+        const cartCopy2=[...S.cart];
         S.sales.push(tx);S.salesTotal+=tot();S.cart=[];S.disc=0;S.cashTendered=0;S.cartOpen=false;
-        save();syncSaleToCloud(tx);closeModal();toast('Sale recorded - '+txid);
+        S.selectedCustomer=null;S.chargeToUtang=false;
+        save();syncSaleToCloud(tx);recordCustomerSale(tx);deductIngredients(cartCopy2);
+        closeModal();toast('Sale recorded - '+txid);
       };
       btns.appendChild(cancelBtn);btns.appendChild(confirmBtn);body.appendChild(btns);
     }
@@ -1697,6 +1813,32 @@ function renderModal(app){
     body.appendChild(chips);
     const btns=document.createElement('div');btns.className='mbtns';
     const cancel=document.createElement('button');cancel.textContent='Cancel';cancel.onclick=closeModal;btns.appendChild(cancel);body.appendChild(btns);
+
+  } else if(m.type==='quickWastage'){
+    body.innerHTML='<div class="mtitle">Log wastage</div>';
+    const grid=document.createElement('div');grid.style.cssText='display:flex;flex-direction:column;gap:12px';
+    [{id:'wItem',lbl:'Item name',type:'text',ph:'e.g. Bread, Coffee'},{id:'wQty',lbl:'Quantity',type:'number',ph:'1'},{id:'wCost',lbl:'Estimated cost (PHP)',type:'number',ph:'0'},{id:'wReason',lbl:'Reason',type:'text',ph:'e.g. Expired, Dropped'}].forEach(f=>{
+      const mf=document.createElement('div');mf.className='mf';mf.innerHTML='<label>'+f.lbl+'</label>';
+      const inp=document.createElement('input');inp.id=f.id;inp.type=f.type;inp.placeholder=f.ph;
+      mf.appendChild(inp);grid.appendChild(mf);
+    });
+    body.appendChild(grid);
+    const btns=document.createElement('div');btns.className='mbtns';
+    const cancel=document.createElement('button');cancel.textContent='Cancel';cancel.onclick=closeModal;
+    const save2=document.createElement('button');save2.className='mpri';save2.textContent='Log';
+    save2.onclick=async function(){
+      const item=(document.getElementById('wItem')||{}).value||'';
+      if(!item){toast('Enter item name');return;}
+      if(CLOUD.token&&CLOUD.bizId){
+        try{
+          const h2={...H,'Authorization':'Bearer '+CLOUD.token};
+          await fetch(SUPA_URL+'/rest/v1/wastage',{method:'POST',headers:{...h2,'Prefer':'return=representation'},body:JSON.stringify({biz_id:CLOUD.bizId,item_name:item,qty:parseFloat((document.getElementById('wQty')||{}).value)||1,cost:parseFloat((document.getElementById('wCost')||{}).value)||0,reason:(document.getElementById('wReason')||{}).value||'',date:new Date().toISOString()})});
+          toast('Wastage logged!');
+        }catch(e){toast('Saved locally');}
+      } else {toast('Sign in to sync wastage to cloud');}
+      closeModal();
+    };
+    btns.appendChild(cancel);btns.appendChild(save2);body.appendChild(btns);
 
   } else if(m.type==='expense'){
     body.innerHTML='<div class="mtitle">Add expense</div>';
