@@ -1350,7 +1350,7 @@ async function loadAttEmployees(){
   try{
     const h2={...H,'Authorization':'Bearer '+CLOUD.token};
     const today=new Date().toISOString().slice(0,10);
-    const empRes=await fetch(SUPA_URL+'/rest/v1/employees?biz_id=eq.'+CLOUD.bizId+'&active=eq.true&order=name',{headers:h2});
+    const empRes=await fetch(SUPA_URL+'/rest/v1/employees?biz_id=eq.'+CLOUD.bizId+'&order=name',{headers:h2});
     const emps=await empRes.json();
     if(!Array.isArray(emps)||emps.length===0){
       toast('BizID: '+CLOUD.bizId+' — 0 employees');
