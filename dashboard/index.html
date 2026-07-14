@@ -363,11 +363,22 @@ function renderAuth(root){
     const res=await signIn(email,pw);
     if(!res.access_token){document.getElementById('dErr').textContent=res.error&&res.error.message||'Sign in failed.';btn.disabled=false;btn.textContent='Sign in to dashboard';return;}
     SESSION.token=res.access_token;SESSION.user=res.user&&res.user.id;SESSION.email=email;
-    // Try to find business by user_id first, then fall back to any business
-    let biz=await api('/rest/v1/businesses?user_id=eq.'+res.user.id);
+    // Fetch business using auth token directly (bypasses RLS anon restrictions)
+    let biz=null;
+    try{
+      const bizRes=await fetch(SB_URL+'/rest/v1/businesses?user_id=eq.'+res.user.id,{
+        headers:{'apikey':SB_KEY,'Authorization':'Bearer '+res.access_token,'Content-Type':'application/json'}
+      });
+      if(bizRes.ok)biz=await bizRes.json();
+    }catch(e){}
     if(!biz||!biz[0]){
-      // Fallback — try getting all businesses visible to this user
-      biz=await api('/rest/v1/businesses?limit=5');
+      // Fallback: get any biz visible to this user with their token
+      try{
+        const bizRes2=await fetch(SB_URL+'/rest/v1/businesses?limit=10',{
+          headers:{'apikey':SB_KEY,'Authorization':'Bearer '+res.access_token,'Content-Type':'application/json'}
+        });
+        if(bizRes2.ok)biz=await bizRes2.json();
+      }catch(e){}
     }
     if(biz&&biz[0]){SESSION.bizId=biz[0].id;SESSION.bizName=biz[0].name;}
     console.log('[ArroyoDash] Login complete. bizId:',SESSION.bizId,'bizName:',SESSION.bizName);
@@ -1537,7 +1548,28 @@ function exportCSV(sales){
   const a=document.createElement('a');a.href=URL.createObjectURL(new Blob([csv],{type:'text/csv'}));a.download='sales-'+new Date().toISOString().slice(0,10)+'.csv';a.click();
 }
 
-if(loadSession()){loadData();}else{render();}
+if(loadSession()){
+  // Always re-verify bizId using auth token (fixes stale/wrong bizId from old sessions)
+  (async function(){
+    try{
+      const r=await fetch(SB_URL+'/rest/v1/businesses?user_id=eq.'+SESSION.user,{
+        headers:{'apikey':SB_KEY,'Authorization':'Bearer '+SESSION.token,'Content-Type':'application/json'}
+      });
+      if(r.ok){
+        const bizData=await r.json();
+        if(bizData&&bizData[0]){
+          if(SESSION.bizId!==bizData[0].id){
+            console.log('[ArroyoDash] BizId corrected from',SESSION.bizId,'to',bizData[0].id);
+            SESSION.bizId=bizData[0].id;
+            SESSION.bizName=bizData[0].name;
+            saveSession();
+          }
+        }
+      }
+    }catch(e){console.warn('[ArroyoDash] BizId re-verify failed:',e);}
+    loadData();
+  })();
+}else{render();}
 </script>
 </body>
 </html>
