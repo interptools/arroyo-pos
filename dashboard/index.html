@@ -201,7 +201,8 @@ function fd(d){return new Date(d).toLocaleDateString('en-PH',{month:'short',day:
 function ft(d){return new Date(d).toLocaleTimeString([],{hour:'2-digit',minute:'2-digit'});}
 
 async function api(path,opts){
-  const h={'apikey':SB_KEY,'Authorization':'Bearer '+SB_KEY,'Content-Type':'application/json',...(opts&&opts.headers||{})};
+  const authToken=(SESSION&&SESSION.token)?SESSION.token:SB_KEY;
+  const h={'apikey':SB_KEY,'Authorization':'Bearer '+authToken,'Content-Type':'application/json',...(opts&&opts.headers||{})};
   try{
     const r=await fetch(SB_URL+path,{...opts,headers:h});
     if(!r.ok){
