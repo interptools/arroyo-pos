@@ -408,6 +408,7 @@ function renderApp(root){
   navItem('sales','ti-receipt','Sales');
   navItem('products','ti-star','Top products');
   navItem('reports','ti-chart-bar','Reports');
+  navItem('pnl','ti-trending-up','Profit & Loss');
   navSection('Operations');
   navItem('inventory','ti-box','Inventory');
   navItem('ingredients','ti-salad','Ingredients'+(D.ingredients.filter(function(i){return i.stock<=i.low_threshold;}).length>0?' ⚠':''));
@@ -445,6 +446,7 @@ function renderApp(root){
   else if(UI.page==='orders'){renderOrders(main);}
   else if(UI.page==='wastage'){renderWastage(main,rev);}
   else if(UI.page==='reports'){renderReports(main,fs,rev,exp,net);}
+  else if(UI.page==='pnl'){renderPnL(main,fs,fe,rev,exp,net);}
   app.appendChild(main);
   // Bottom navigation for mobile
   const bnav=el('div','bottom-nav');
@@ -455,6 +457,21 @@ function renderApp(root){
   app.appendChild(bnav);
   root.appendChild(app);
   if(UI.modal)renderModal(root);
+}
+
+function calcCOGS(salesArr){
+  // Calculate Cost of Goods Sold from recipes
+  let cogs=0;
+  salesArr.filter(function(s){return!s.voided;}).forEach(function(s){
+    (s.items||[]).forEach(function(item){
+      const recipes=D.recipes.filter(function(r){return r.product_name===item.name;});
+      recipes.forEach(function(r){
+        const ing=D.ingredients.find(function(i){return i.id===r.ingredient_id;});
+        if(ing)cogs+=r.qty_used*(item.qty||1)*ing.cost_per_unit;
+      });
+    });
+  });
+  return cogs;
 }
 
 function renderOverview(main,fs,fe,rev,exp,net){
@@ -469,12 +486,36 @@ function renderOverview(main,fs,fe,rev,exp,net){
     main.appendChild(alert);
   }
   main.appendChild(filterBar());
+  const cogs=calcCOGS(fs);
+  const grossProfit=rev-cogs;
+  const netProfit=rev-exp;
+  const grossMargin=rev>0?Math.round(grossProfit/rev*100):0;
   const sg=el('div','stats-grid');
   sg.appendChild(statCard('Revenue',fmt(rev),fs.length+' transactions','blue'));
+  sg.appendChild(statCard('Gross profit',fmt(grossProfit),grossMargin+'% margin',grossProfit>=0?'green':'red'));
   sg.appendChild(statCard('Expenses',fmt(exp),fe.length+' entries','red'));
-  sg.appendChild(statCard('Net profit',fmt(net),net>=0?'Profitable':'Loss',net>=0?'green':'red'));
-  sg.appendChild(statCard('Avg sale',fmt(fs.length?rev/fs.length:0),'per transaction',''));
+  sg.appendChild(statCard('Net profit',fmt(netProfit),netProfit>=0?'After all costs':'Loss',netProfit>=0?'green':'red'));
   main.appendChild(sg);
+
+  // Profit summary bar
+  const profBar=el('div','card');
+  profBar.style.marginBottom='16px';
+  const pbRows=[
+    {l:'Revenue',v:fmt(rev),c:'var(--ac)'},
+    {l:'Cost of goods (ingredients)',v:'− '+fmt(cogs),c:'var(--dt)'},
+    {l:'Gross profit',v:fmt(grossProfit),c:'var(--st)',bold:true},
+    {l:'Operating expenses',v:'− '+fmt(exp),c:'var(--dt)'},
+    {l:'Net profit',v:fmt(netProfit),c:netProfit>=0?'var(--st)':'var(--dt)',bold:true,big:true},
+  ];
+  profBar.innerHTML='<div class="card-hd">Profit summary <span>'+UI.filter+'</span></div>';
+  pbRows.forEach(function(row){
+    const r=el('div','');
+    r.style.cssText='display:flex;justify-content:space-between;padding:'+(row.big?'12px 0 4px':'7px 0')+';border-bottom:1px solid var(--b1);'+(row.big?'border-top:2px solid var(--b2);margin-top:4px':'');
+    r.innerHTML='<span style="font-size:'+(row.big?'15':'13')+'px;font-weight:'+(row.bold?'700':'400')+';color:var(--t'+(row.bold?'1':'2')+')">'+row.l+'</span>'+
+      '<span style="font-size:'+(row.big?'16':'13')+'px;font-weight:700;color:'+row.c+'">'+row.v+'</span>';
+    profBar.appendChild(r);
+  });
+  main.appendChild(profBar);
   const cc=el('div','card');cc.innerHTML='<div class="card-hd">Revenue by day <span>'+UI.filter+'</span></div>';
   const cw=el('div','chart-wrap');const cv=document.createElement('canvas');cv.id='sChart';cw.appendChild(cv);cc.appendChild(cw);main.appendChild(cc);
   const two=el('div','two-col');
@@ -736,22 +777,44 @@ function renderSuppliers(main){
 
 function renderRecipes(main){
   main.appendChild(el('div','page-title','Recipes'));
-  const sg=el('div','stats-grid');
   const prodWithRecipe=new Set(D.recipes.map(function(r){return r.product_name;})).size;
+
+  // Calculate servings remaining per product (limited by the most constraining ingredient)
+  function servingsRemaining(p){
+    const recipes=D.recipes.filter(function(r){return r.product_name===p.name;});
+    if(!recipes.length)return null;
+    let min=Infinity;
+    recipes.forEach(function(r){
+      const ing=D.ingredients.find(function(i){return i.id===r.ingredient_id;});
+      if(ing&&r.qty_used>0){const s=Math.floor(ing.stock/r.qty_used);if(s<min)min=s;}
+    });
+    return min===Infinity?null:min;
+  }
+
+  const sg=el('div','stats-grid');
   sg.appendChild(statCard('Products',D.products.length,'total',''));
-  sg.appendChild(statCard('With recipes',prodWithRecipe,'linked to ingredients','blue'));
-  sg.appendChild(statCard('Without recipes',D.products.length-prodWithRecipe,'no ingredients set','amber'));
+  sg.appendChild(statCard('With recipes',prodWithRecipe,'linked','blue'));
+  // Total servings possible across all products
+  let totalServings=0;
+  D.products.forEach(function(p){const s=servingsRemaining(p);if(s!==null)totalServings+=s;});
+  sg.appendChild(statCard('Total servings',totalServings,'can still make','green'));
+  sg.appendChild(statCard('No recipe',D.products.length-prodWithRecipe,'need setup','amber'));
   main.appendChild(sg);
 
-  const note=el('div','',);note.style.cssText='font-size:13px;color:var(--t2);margin-bottom:16px;padding:12px 14px;background:var(--bg2);border-radius:10px;line-height:1.6';
+  const note=el('div','');note.style.cssText='font-size:13px;color:var(--t2);margin-bottom:16px;padding:12px 14px;background:var(--bg2);border-radius:10px;line-height:1.6';
   note.textContent='Set up ingredients per product here. When a product is sold on the POS, its ingredients are automatically deducted from stock.';
   main.appendChild(note);
 
   D.products.forEach(function(p){
     const prodRecipes=D.recipes.filter(function(r){return r.product_name===p.name;});
+    const servings=servingsRemaining(p);
     const card=el('div','card');
     const hd=el('div','card-hd');
-    hd.innerHTML='<div><div style="font-size:15px;font-weight:700">'+p.name+'</div><div style="font-size:12px;color:var(--t3)">'+p.cat+' · '+fmt(p.price)+'</div></div>';
+
+    // Servings badge
+    const servBadge=servings!==null?'<span class="badge '+(servings<=5?'b-red':servings<=20?'b-amber':'b-green')+'">'+servings+' servings left</span>':'<span class="badge b-gray">No recipe</span>';
+    hd.innerHTML='<div><div style="font-size:15px;font-weight:700">'+p.name+' '+servBadge+'</div><div style="font-size:12px;color:var(--t3);margin-top:3px">'+p.cat+' · '+fmt(p.price)+'</div></div>';
+
     const addIngBtn=addBtn('+ Add ingredient',function(){UI.modal={type:'recipe',product:p,item:null};render();});
     hd.appendChild(addIngBtn);card.appendChild(hd);
 
@@ -760,12 +823,29 @@ function renderRecipes(main){
       empty.style.cssText='font-size:12px;color:var(--t3);padding:8px 0';
       card.appendChild(empty);
     } else {
+      // Cost per serving
+      let costPerServing=0;
       prodRecipes.forEach(function(r){
         const ing=D.ingredients.find(function(i){return i.id===r.ingredient_id;});
+        if(ing)costPerServing+=r.qty_used*ing.cost_per_unit;
+      });
+      const margin=p.price-costPerServing;
+      const marginPct=p.price>0?Math.round(margin/p.price*100):0;
+      const summary=el('div','');
+      summary.style.cssText='display:flex;gap:12px;flex-wrap:wrap;padding:8px 0 12px;border-bottom:1px solid var(--b1);margin-bottom:4px';
+      summary.innerHTML='<div style="font-size:12px"><span style="color:var(--t3)">Cost/serving: </span><span style="font-weight:700;color:var(--dt)">'+fmt(costPerServing)+'</span></div>'+
+        '<div style="font-size:12px"><span style="color:var(--t3)">Gross profit: </span><span style="font-weight:700;color:var(--st)">'+fmt(margin)+'</span></div>'+
+        '<div style="font-size:12px"><span style="color:var(--t3)">Margin: </span><span style="font-weight:700;color:'+(marginPct>=50?'var(--st)':marginPct>=25?'var(--wt)':'var(--dt)')+'">'+marginPct+'%</span></div>';
+      card.appendChild(summary);
+
+      prodRecipes.forEach(function(r){
+        const ing=D.ingredients.find(function(i){return i.id===r.ingredient_id;});
+        const sLeft=ing&&r.qty_used>0?Math.floor(ing.stock/r.qty_used):0;
         const row=el('div','row');
-        const rl=el('div','row-l');rl.innerHTML='<div class="row-name">'+r.ingredient_name+'</div><div class="row-sub">'+(ing?'Current stock: '+ing.stock+' '+ing.unit:'Ingredient not found')+'</div>';
+        const rl=el('div','row-l');
+        rl.innerHTML='<div class="row-name">'+r.ingredient_name+'</div><div class="row-sub">'+(ing?ing.stock+' '+ing.unit+' in stock · <span style="color:'+(sLeft<=5?'var(--dt)':sLeft<=20?'var(--wt)':'var(--t3)')+'">'+sLeft+' servings from this ingredient</span>':'Ingredient not found')+'</div>';
         const rr=el('div','row-r');
-        const qty=el('span','');qty.style.cssText='font-size:13px;font-weight:700;color:var(--ac)';qty.textContent=r.qty_used+' '+(ing?ing.unit:'units')+' per sale';
+        const qty=el('span','');qty.style.cssText='font-size:13px;font-weight:700;color:var(--ac);white-space:nowrap';qty.textContent=r.qty_used+' '+(ing?ing.unit:'units')+'/sale';
         const edBtn=el('button','sm-btn','Edit');
         edBtn.onclick=function(){UI.modal={type:'recipe',product:p,item:r};render();};
         const rmBtn=el('button','sm-btn','Remove');rmBtn.style.color='var(--dt)';
@@ -776,34 +856,101 @@ function renderRecipes(main){
     }
     main.appendChild(card);
   });
-  if(!D.products.length)main.appendChild(el('div','empty','No products found — add products in the POS app first'));
+  if(!D.products.length)main.appendChild(el('div','empty','No products found — sync products from the POS app first (Admin → Sync now)'));
 }
 
 function renderIngredients(main){
   main.appendChild(el('div','page-title','Ingredients'));
+
+  // Calculations
+  const totalCostValue=D.ingredients.reduce(function(a,i){return a+i.stock*i.cost_per_unit;},0);
   const low=D.ingredients.filter(function(i){return i.stock<=i.low_threshold;}).length;
+  const out=D.ingredients.filter(function(i){return i.stock<=0;}).length;
+
+  // Daily consumption — based on last 7 days sales
+  const now=new Date();const week=new Date(now);week.setDate(week.getDate()-7);
+  const recentSales=D.sales.filter(function(s){return!s.voided&&new Date(s.date)>=week;});
+  const dailyConsumption={};
+  recentSales.forEach(function(s){
+    (s.items||[]).forEach(function(item){
+      const recipes=D.recipes.filter(function(r){return r.product_name===item.name;});
+      recipes.forEach(function(r){
+        dailyConsumption[r.ingredient_id]=(dailyConsumption[r.ingredient_id]||0)+(r.qty_used*(item.qty||1));
+      });
+    });
+  });
+  // Convert to daily avg (divide by 7)
+  Object.keys(dailyConsumption).forEach(function(k){dailyConsumption[k]=dailyConsumption[k]/7;});
+
+  // Days of stock remaining per ingredient
+  const daysRemaining={};
+  D.ingredients.forEach(function(i){
+    const daily=dailyConsumption[i.id]||0;
+    daysRemaining[i.id]=daily>0?Math.floor(i.stock/daily):null;
+  });
+
   const sg=el('div','stats-grid');
   sg.appendChild(statCard('Ingredients',D.ingredients.length,'',''));
-  sg.appendChild(statCard('Low stock',low,'',low>0?'red':''));
-  sg.appendChild(statCard('Cost value',fmt(D.ingredients.reduce(function(a,i){return a+i.stock*i.cost_per_unit;},0)),'total','blue'));
+  sg.appendChild(statCard('Total cost value',fmt(totalCostValue),'in stock','blue'));
+  sg.appendChild(statCard('Low stock',low,'need restocking',low>0?'red':'green'));
+  sg.appendChild(statCard('Out of stock',out,'',out>0?'red':''));
   main.appendChild(sg);
+
+  // Cost summary card
+  const costCard=el('div','card');
+  costCard.innerHTML='<div class="card-hd">Cost breakdown</div>';
+  const costRows=[
+    ['Total ingredient value',fmt(totalCostValue),''],
+    ['Average cost per ingredient',D.ingredients.length?fmt(totalCostValue/D.ingredients.length):'PHP 0.00',''],
+    ['Most expensive ingredient',(function(){const s=D.ingredients.slice().sort(function(a,b){return b.stock*b.cost_per_unit-a.stock*a.cost_per_unit;});return s[0]?s[0].name+' ('+fmt(s[0].stock*s[0].cost_per_unit)+')':'None';})(),''],
+  ];
+  costRows.forEach(function(row){
+    const r=el('div','payslip-row');
+    r.innerHTML='<span>'+row[0]+'</span><span style="font-weight:600;color:var(--ac)">'+row[1]+'</span>';
+    costCard.appendChild(r);
+  });
+  main.appendChild(costCard);
+
+  // Stock list with days remaining
   const c=el('div','card');
   const hd=el('div','card-hd','Ingredient stock');hd.appendChild(addBtn('+ Add ingredient',function(){UI.modal={type:'ingredient',item:null};render();}));c.appendChild(hd);
   D.ingredients.sort(function(a,b){return a.stock-b.stock;}).forEach(function(ing){
     const isLow=ing.stock<=ing.low_threshold;
+    const days=daysRemaining[ing.id];
+    const dailyUse=dailyConsumption[ing.id]||0;
     const r=el('div','row');
     const rl=el('div','row-l');
-    rl.innerHTML='<div class="row-name">'+ing.name+'</div><div class="row-sub">'+ing.unit+' · Cost: '+fmt(ing.cost_per_unit)+'/unit</div>';
+    let sub=ing.unit+' · PHP '+ing.cost_per_unit+'/unit · Value: '+fmt(ing.stock*ing.cost_per_unit);
+    if(dailyUse>0)sub+='<br><span style="color:'+(days&&days<=3?'var(--dt)':days&&days<=7?'var(--wt)':'var(--st)')+'">~'+dailyUse.toFixed(1)+ing.unit+'/day · '+(days!==null?days+' days left':'unlimited')+'</span>';
+    else sub+='<br><span style="color:var(--t3)">No sales data yet</span>';
+    rl.innerHTML='<div class="row-name">'+ing.name+'</div><div class="row-sub" style="line-height:1.6">'+sub+'</div>';
     const rr=el('div','row-r');
     const badge=el('span','badge '+(isLow?'b-amber':'b-green'),ing.stock+' '+(isLow?'⚠ low':'OK'));
     const editBtn=el('button','sm-btn','Edit');
     editBtn.onclick=function(){UI.modal={type:'ingredient',item:ing};render();};
     rr.appendChild(badge);rr.appendChild(editBtn);
-    r.appendChild(rl);r.appendChild(rr);
-    c.appendChild(r);
+    r.appendChild(rl);r.appendChild(rr);c.appendChild(r);
   });
   if(!D.ingredients.length)c.appendChild(el('div','empty','No ingredients yet'));
   main.appendChild(c);
+
+  // Weekly consumption forecast
+  if(Object.keys(dailyConsumption).length>0){
+    const fc=el('div','card');
+    fc.innerHTML='<div class="card-hd">Weekly consumption forecast <span>based on last 7 days</span></div>';
+    D.ingredients.forEach(function(ing){
+      const daily=dailyConsumption[ing.id]||0;
+      if(!daily)return;
+      const weekly=daily*7;const days=daysRemaining[ing.id];
+      const pct=Math.min(ing.stock/Math.max(weekly,1)*100,100);
+      const r=el('div','');r.style.cssText='padding:10px 0;border-bottom:1px solid var(--b1)';
+      r.innerHTML='<div style="display:flex;justify-content:space-between;margin-bottom:6px"><span style="font-size:13px;font-weight:600">'+ing.name+'</span><span style="font-size:12px;color:var(--t3)">'+weekly.toFixed(0)+ing.unit+'/week used</span></div>'+
+        '<div style="height:6px;background:var(--bg3);border-radius:3px;overflow:hidden"><div style="height:100%;width:'+pct+'%;background:'+(pct<20?'var(--dt)':pct<50?'var(--wt)':'var(--ac)')+';border-radius:3px;transition:width .4s"></div></div>'+
+        '<div style="display:flex;justify-content:space-between;margin-top:4px"><span style="font-size:11px;color:var(--t3)">'+ing.stock+ing.unit+' remaining</span><span style="font-size:11px;color:'+(days&&days<=7?'var(--dt)':'var(--t3)')+'">'+(days!==null?days+' days left':'No usage data')+'</span></div>';
+      fc.appendChild(r);
+    });
+    main.appendChild(fc);
+  }
 }
 
 function renderOrders(main){
@@ -857,9 +1004,122 @@ function renderWastage(main,rev){
   tbl.appendChild(tb);c.appendChild(tbl);main.appendChild(c);
 }
 
+function renderPnL(main,fs,fe,rev,exp,net){
+  main.appendChild(el('div','page-title','Profit & Loss'));
+  main.appendChild(filterBar());
+
+  const cogs=calcCOGS(fs);
+  const grossProfit=rev-cogs;
+  const grossMargin=rev>0?Math.round(grossProfit/rev*100):0;
+  const vat=rev/1.12*0.12;
+  const netSales=rev-vat;
+  const netProfit=rev-exp;
+  const netMargin=rev>0?Math.round(netProfit/rev*100):0;
+  const salaryExp=D.employees.filter(function(e){return e.pay_type==='monthly';}).reduce(function(a,e){return a+e.rate;},0);
+  const wasteCost=D.wastage.reduce(function(a,w){return a+w.cost;},0);
+
+  // Summary stats
+  const sg=el('div','stats-grid');
+  sg.appendChild(statCard('Gross profit',fmt(grossProfit),grossMargin+'% margin',grossProfit>=0?'green':'red'));
+  sg.appendChild(statCard('Net profit',fmt(netProfit),netMargin+'% margin',netProfit>=0?'green':'red'));
+  sg.appendChild(statCard('COGS',fmt(cogs),'ingredient costs','red'));
+  sg.appendChild(statCard('Wastage cost',fmt(wasteCost),'losses','amber'));
+  main.appendChild(sg);
+
+  // Full P&L statement
+  const pl=el('div','card');
+  pl.innerHTML='<div class="card-hd">Profit & Loss Statement <span>'+UI.filter+'</span></div>';
+
+  function plSection(title){
+    const h=el('div','');h.style.cssText='font-size:10px;font-weight:800;color:var(--t3);text-transform:uppercase;letter-spacing:1px;padding:14px 0 6px;border-bottom:1px solid var(--b2);margin-top:4px';
+    h.textContent=title;pl.appendChild(h);
+  }
+  function plRow(label,value,color,bold,indent){
+    const r=el('div','');
+    r.style.cssText='display:flex;justify-content:space-between;padding:8px 0;border-bottom:1px solid var(--b1)';
+    r.innerHTML='<span style="font-size:13px;color:'+(color||'var(--t2)')+';font-weight:'+(bold?'700':'400')+';padding-left:'+(indent?'16px':'0')+'">'+label+'</span>'+
+      '<span style="font-size:13px;font-weight:'+(bold?'800':'600')+';color:'+(color||'var(--t2)')+'">'+value+'</span>';
+    pl.appendChild(r);
+  }
+  function plTotal(label,value,color){
+    const r=el('div','');
+    r.style.cssText='display:flex;justify-content:space-between;padding:12px 0;margin-top:2px;border-top:2px solid var(--b2)';
+    r.innerHTML='<span style="font-size:15px;font-weight:800;color:'+(color||'var(--t1)')+'">'+label+'</span>'+
+      '<span style="font-size:16px;font-weight:900;color:'+(color||'var(--t1)')+'">'+value+'</span>';
+    pl.appendChild(r);
+  }
+
+  plSection('Revenue');
+  plRow('Gross sales',fmt(rev),'var(--t1)',true);
+  plRow('VAT (12%)',fmt(vat),'var(--t3)',false,true);
+  plRow('Net sales (excl. VAT)',fmt(netSales),'var(--ac)',true);
+
+  plSection('Cost of Goods Sold');
+  plRow('Ingredient costs',fmt(cogs),'var(--t2)',false);
+  plRow('Wastage / spoilage',fmt(wasteCost),'var(--wt)',false);
+  plTotal('Gross Profit',fmt(grossProfit),grossProfit>=0?'var(--st)':'var(--dt)');
+  const r1=el('div','');r1.style.cssText='font-size:11px;color:var(--t3);padding:4px 0 8px;text-align:right';r1.textContent='Gross margin: '+grossMargin+'%';pl.appendChild(r1);
+
+  plSection('Operating Expenses');
+  // Break down expenses by category
+  const expByCat={};
+  fe.forEach(function(e){expByCat[e.cat||'Other']=(expByCat[e.cat||'Other']||0)+e.amount;});
+  Object.entries(expByCat).forEach(function(entry){plRow(entry[0],fmt(entry[1]),'var(--t2)',false,true);});
+  if(salaryExp>0)plRow('Salaries (monthly staff)',fmt(salaryExp),'var(--t2)',false,true);
+  plRow('Total operating expenses',fmt(exp+salaryExp),'var(--t2)',true);
+  plTotal('Net Profit',fmt(netProfit),netProfit>=0?'var(--st)':'var(--dt)');
+  const r2=el('div','');r2.style.cssText='font-size:11px;color:var(--t3);padding:4px 0 8px;text-align:right';r2.textContent='Net margin: '+netMargin+'%';pl.appendChild(r2);
+
+  main.appendChild(pl);
+
+  // Per product profitability
+  const prodCard=el('div','card');
+  prodCard.innerHTML='<div class="card-hd">Per product profitability</div>';
+  const prodProfit=[];
+  D.products.forEach(function(p){
+    const recipes=D.recipes.filter(function(r){return r.product_name===p.name;});
+    let cogs2=0;
+    recipes.forEach(function(r){
+      const ing=D.ingredients.find(function(i){return i.id===r.ingredient_id;});
+      if(ing)cogs2+=r.qty_used*ing.cost_per_unit;
+    });
+    const sold=fs.filter(function(s){return!s.voided;}).reduce(function(a,s){
+      return a+(s.items||[]).filter(function(i){return i.name===p.name;}).reduce(function(b,i){return b+(i.qty||1);},0);
+    },0);
+    if(sold>0)prodProfit.push({name:p.name,price:p.price,cogs:cogs2,margin:p.price>0?Math.round((p.price-cogs2)/p.price*100):0,sold,totalProfit:(p.price-cogs2)*sold});
+  });
+  prodProfit.sort(function(a,b){return b.totalProfit-a.totalProfit;});
+  if(!prodProfit.length){
+    prodCard.appendChild(el('div','empty','No sales data yet — set up recipes to see per-product profit'));
+  } else {
+    prodProfit.forEach(function(p,i){
+      const r=el('div','row');
+      const rl=el('div','row-l');
+      rl.innerHTML='<div class="row-name">'+(i+1)+'. '+p.name+'</div><div class="row-sub">Sold: '+p.sold+' · Cost/unit: '+fmt(p.cogs)+'</div>';
+      const rr=el('div','row-r');
+      rr.style.cssText='display:flex;flex-direction:column;align-items:flex-end;gap:3px';
+      rr.innerHTML='<span style="font-weight:700;color:var(--st)">'+fmt(p.totalProfit)+'</span>'+
+        '<span class="badge '+(p.margin>=50?'b-green':p.margin>=25?'b-amber':'b-red')+'">'+p.margin+'% margin</span>';
+      r.appendChild(rl);r.appendChild(rr);prodCard.appendChild(r);
+    });
+  }
+  main.appendChild(prodCard);
+}
+
 function renderReports(main,fs,rev,exp,net){
   main.appendChild(el('div','page-title','Reports'));
   main.appendChild(filterBar());
+
+  const cogs=calcCOGS(fs);
+  const grossProfit=rev-cogs;
+  const grossMargin=rev>0?Math.round(grossProfit/rev*100):0;
+  const netMargin=rev>0?Math.round(net/rev*100):0;
+
+  // Quick profit summary at top of reports
+  const ps=el('div','stats-grid');
+  ps.appendChild(statCard('Gross profit',fmt(grossProfit),grossMargin+'% gross margin',grossProfit>=0?'green':'red'));
+  ps.appendChild(statCard('Net profit',fmt(net),netMargin+'% net margin',net>=0?'green':'red'));
+  main.appendChild(ps);
   const gross=rev;const vat=gross/1.12*0.12;const netSales=gross-vat;
   const vc=el('div','card');vc.innerHTML='<div class="card-hd">VAT summary (12%)</div>';
   [['Gross sales (VAT inclusive)',fmt(gross)],['VAT collected (output)',fmt(vat)],['Net sales (excl. VAT)',fmt(netSales)],['Total expenses',fmt(exp)],['Net income before tax',fmt(netSales-exp)]].forEach(function(row){
