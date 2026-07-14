@@ -183,6 +183,80 @@ html,body{min-height:100%;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI
   /* Hide sidebar brand on mobile - shown in topbar instead */
   .mobile-topbar{display:flex!important}
 }
+
+/* ===== IMPROVED EMPLOYEE & ATTENDANCE ===== */
+.emp-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(280px,1fr));gap:12px;margin-bottom:4px}
+.emp-card2{background:var(--bg2);border:1px solid var(--b1);border-radius:12px;padding:16px;display:flex;flex-direction:column;gap:10px;transition:border-color .15s}
+.emp-card2:hover{border-color:var(--b2)}
+.emp-head{display:flex;align-items:center;gap:12px}
+.emp-av2{width:42px;height:42px;border-radius:12px;background:rgba(47,129,247,0.15);display:flex;align-items:center;justify-content:center;font-size:16px;font-weight:800;color:var(--ac);flex-shrink:0;border:1.5px solid rgba(47,129,247,0.25)}
+.emp-meta{flex:1;min-width:0}
+.emp-name2{font-size:14px;font-weight:700;color:var(--t1);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.emp-role2{display:flex;align-items:center;gap:6px;margin-top:3px}
+.emp-status-dot{width:7px;height:7px;border-radius:50%;flex-shrink:0}
+.emp-status-dot.in{background:var(--st)}
+.emp-status-dot.out{background:var(--t3)}
+.emp-pay2{font-size:11px;color:var(--t2);padding:4px 10px;background:var(--bg3);border-radius:20px;border:1px solid var(--b1);white-space:nowrap}
+.emp-actions{display:flex;gap:6px;flex-wrap:wrap}
+.emp-actions .sm-btn{flex:1;min-width:60px;text-align:center;justify-content:center}
+/* Attendance timeline */
+.att-day-group{margin-bottom:16px}
+.att-day-label{font-size:10px;font-weight:700;color:var(--t3);text-transform:uppercase;letter-spacing:.8px;padding:4px 0 8px;display:flex;align-items:center;gap:8px}
+.att-day-label::after{content:'';flex:1;height:1px;background:var(--b1)}
+.att-row2{display:flex;align-items:center;gap:12px;padding:10px 12px;background:var(--bg2);border-radius:8px;margin-bottom:6px;border:1px solid var(--b1)}
+.att-avatar{width:30px;height:30px;border-radius:8px;background:rgba(47,129,247,0.15);display:flex;align-items:center;justify-content:center;font-size:11px;font-weight:800;color:var(--ac);flex-shrink:0}
+.att-info{flex:1;min-width:0}
+.att-name2{font-size:13px;font-weight:600;color:var(--t1)}
+.att-times{display:flex;align-items:center;gap:8px;margin-top:3px;flex-wrap:wrap}
+.att-time-block{display:flex;align-items:center;gap:4px;font-size:11px;color:var(--t2)}
+.att-time-block i{font-size:11px}
+.att-arrow{color:var(--t3);font-size:10px}
+.att-active-badge{font-size:10px;font-weight:700;padding:2px 8px;border-radius:20px;background:rgba(63,185,80,0.12);color:var(--st);border:1px solid rgba(63,185,80,0.2)}
+.att-hours{font-size:13px;font-weight:700;color:var(--ac);white-space:nowrap;flex-shrink:0}
+.att-hours.active{color:var(--st)}
+@media(max-width:768px){.emp-grid{grid-template-columns:1fr}}
+
+/* ===== TODAY'S SHIFT TRACKER ===== */
+.shift-header{display:flex;align-items:center;justify-content:space-between;margin-bottom:14px;flex-wrap:wrap;gap:8px}
+.shift-date{font-size:12px;color:var(--t3);font-weight:600}
+.shift-summary{display:flex;gap:8px;flex-wrap:wrap;margin-bottom:16px}
+.shift-pill{padding:6px 14px;border-radius:20px;font-size:12px;font-weight:700;display:flex;align-items:center;gap:6px}
+.shift-pill.in{background:rgba(63,185,80,0.12);color:var(--st);border:1px solid rgba(63,185,80,0.25)}
+.shift-pill.out{background:var(--bg3);color:var(--t3);border:1px solid var(--b1)}
+.shift-pill.total{background:rgba(47,129,247,0.1);color:var(--ac);border:1px solid rgba(47,129,247,0.2)}
+.shift-dot{width:8px;height:8px;border-radius:50%;background:currentColor}
+/* Employee shift rows */
+.shift-row{display:flex;align-items:center;gap:12px;padding:12px;background:var(--bg2);border-radius:10px;margin-bottom:8px;border:1.5px solid var(--b1);transition:border-color .15s}
+.shift-row.clocked-in{border-color:rgba(63,185,80,0.3);background:rgba(63,185,80,0.04)}
+.shift-row.clocked-out{opacity:.85}
+.shift-av{width:36px;height:36px;border-radius:10px;display:flex;align-items:center;justify-content:center;font-size:13px;font-weight:800;flex-shrink:0}
+.shift-av.in{background:rgba(63,185,80,0.15);color:var(--st)}
+.shift-av.out{background:var(--bg3);color:var(--t3)}
+.shift-info{flex:1;min-width:0}
+.shift-name{font-size:14px;font-weight:600;color:var(--t1)}
+.shift-role{font-size:11px;color:var(--t3);margin-top:1px}
+.shift-times{display:flex;align-items:center;gap:6px;flex-wrap:wrap}
+.shift-time-in{font-size:12px;color:var(--st);font-weight:600;display:flex;align-items:center;gap:3px}
+.shift-time-out{font-size:12px;color:var(--t2);font-weight:600;display:flex;align-items:center;gap:3px}
+.shift-sep{color:var(--t3);font-size:11px}
+.shift-noshow{font-size:12px;color:var(--t3);font-style:italic}
+.shift-hrs{font-size:13px;font-weight:800;text-align:right;flex-shrink:0;min-width:44px}
+.shift-hrs.active{color:var(--st)}
+.shift-hrs.done{color:var(--ac)}
+.shift-hrs.none{color:var(--t3)}
+/* Duration live label */
+.shift-duration{font-size:10px;color:var(--t3);margin-top:2px}
+/* History tabs */
+.att-tabs{display:flex;gap:4px;margin-bottom:14px;overflow-x:auto;padding-bottom:2px}
+.att-tabs::-webkit-scrollbar{height:0}
+.att-tab{padding:6px 14px;border-radius:6px;border:1px solid var(--b2);background:transparent;color:var(--t2);font-size:12px;font-weight:500;cursor:pointer;white-space:nowrap;transition:all .15s;flex-shrink:0}
+.att-tab.on{background:var(--ac);color:#fff;border-color:var(--ac)}
+/* Per employee history modal */
+.emp-hist-row{display:flex;justify-content:space-between;align-items:center;padding:10px 0;border-bottom:1px solid var(--b1);gap:12px}
+.emp-hist-row:last-child{border-bottom:none}
+.emp-hist-date{font-size:12px;font-weight:700;color:var(--t2);min-width:80px}
+.emp-hist-times{font-size:12px;color:var(--t2);flex:1}
+.emp-hist-hrs{font-size:13px;font-weight:700;color:var(--ac)}
 </style>
 </head>
 <body>
@@ -363,24 +437,34 @@ function renderAuth(root){
     const res=await signIn(email,pw);
     if(!res.access_token){document.getElementById('dErr').textContent=res.error&&res.error.message||'Sign in failed.';btn.disabled=false;btn.textContent='Sign in to dashboard';return;}
     SESSION.token=res.access_token;SESSION.user=res.user&&res.user.id;SESSION.email=email;
-    // Fetch business using auth token directly (bypasses RLS anon restrictions)
-    let biz=null;
+    // Smart biz finder on login
+    const loginHeaders={'apikey':SB_KEY,'Authorization':'Bearer '+res.access_token,'Content-Type':'application/json'};
+    // First check if POS is open in the same browser - use its bizId directly
+    let posBizId=null;
+    try{const pc=JSON.parse(localStorage.getItem('arroyo_cloud')||'{}');if(pc&&pc.bizId)posBizId=pc.bizId;}catch(e){}
+    let bizList=null;
     try{
-      const bizRes=await fetch(SB_URL+'/rest/v1/businesses?user_id=eq.'+res.user.id,{
-        headers:{'apikey':SB_KEY,'Authorization':'Bearer '+res.access_token,'Content-Type':'application/json'}
-      });
-      if(bizRes.ok)biz=await bizRes.json();
+      const bizRes=await fetch(SB_URL+'/rest/v1/businesses?user_id=eq.'+res.user.id+'&order=created_at.asc',{headers:loginHeaders});
+      if(bizRes.ok)bizList=await bizRes.json();
     }catch(e){}
-    if(!biz||!biz[0]){
-      // Fallback: get any biz visible to this user with their token
-      try{
-        const bizRes2=await fetch(SB_URL+'/rest/v1/businesses?limit=10',{
-          headers:{'apikey':SB_KEY,'Authorization':'Bearer '+res.access_token,'Content-Type':'application/json'}
-        });
-        if(bizRes2.ok)biz=await bizRes2.json();
-      }catch(e){}
+    if(bizList&&bizList.length>0){
+      let correctBiz=bizList[0];
+      // Use POS bizId if it matches a known business record
+      if(posBizId){
+        const match=bizList.find(function(b){return b.id===posBizId;});
+        if(match){correctBiz=match;}
+      } else if(bizList.length>1){
+        // Pick biz with most data
+        let best=0;
+        for(const b of bizList){
+          let score=0;
+          try{const sr=await fetch(SB_URL+'/rest/v1/sales?biz_id=eq.'+b.id+'&limit=1',{headers:loginHeaders});if(sr.ok){const sd=await sr.json();if(sd&&sd.length>0)score+=10;}}catch(e){}
+          try{const er=await fetch(SB_URL+'/rest/v1/employees?biz_id=eq.'+b.id+'&limit=1',{headers:loginHeaders});if(er.ok){const ed=await er.json();if(ed&&ed.length>0)score+=5;}}catch(e){}
+          if(score>best){best=score;correctBiz=b;}
+        }
+      }
+      SESSION.bizId=correctBiz.id;SESSION.bizName=correctBiz.name;
     }
-    if(biz&&biz[0]){SESSION.bizId=biz[0].id;SESSION.bizName=biz[0].name;}
     console.log('[ArroyoDash] Login complete. bizId:',SESSION.bizId,'bizName:',SESSION.bizName);
     saveSession();await loadData();
   };
@@ -443,7 +527,19 @@ function renderApp(root){
   const foot=el('div','sb-foot');
   foot.innerHTML='<div class="user-email">'+SESSION.email+'</div><div style="font-size:10px;color:var(--t3);padding:2px 8px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="'+SESSION.bizId+'">biz: '+(SESSION.bizId?SESSION.bizId.slice(0,8)+'...':'⚠ none')+'</div>';
   const syncBtn=el('button','so-btn','<i class="ti ti-refresh" style="font-size:14px;vertical-align:-2px;margin-right:4px"></i>Sync data');
-  syncBtn.onclick=async function(){syncBtn.textContent='Syncing...';await loadData();syncBtn.innerHTML='<i class="ti ti-refresh" style="font-size:14px;vertical-align:-2px;margin-right:4px"></i>Sync data';};
+  syncBtn.onclick=async function(){
+    syncBtn.textContent='Finding data...';
+    // Re-sync bizId from POS localStorage first
+    try{
+      const posCloud=JSON.parse(localStorage.getItem('arroyo_cloud')||'{}');
+      if(posCloud&&posCloud.bizId&&posCloud.bizId!==SESSION.bizId){
+        SESSION.bizId=posCloud.bizId;saveSession();
+        console.log('[ArroyoDash] Sync updated bizId from POS:',SESSION.bizId);
+      }
+    }catch(e){}
+    await loadData();
+    syncBtn.innerHTML='<i class="ti ti-refresh" style="font-size:14px;vertical-align:-2px;margin-right:4px"></i>Sync data';
+  };
   foot.appendChild(syncBtn);
   const soBtn=el('button','so-btn','<i class="ti ti-logout" style="font-size:14px;vertical-align:-2px;margin-right:4px"></i>Sign out');
   soBtn.onclick=signOut;foot.appendChild(soBtn);
@@ -543,7 +639,7 @@ function renderOverview(main,fs,fe,rev,exp,net){
     tip.style.cssText='background:rgba(47,129,247,0.08);border:1px solid rgba(47,129,247,0.2);border-radius:8px;padding:10px 14px;margin-top:10px;font-size:12px;color:var(--t2);line-height:1.6';
     tip.innerHTML='<strong style="color:var(--ac)">💡 Set up recipes to see full profit calculation</strong><br>'+
       'Cost of goods shows PHP 0.00 because no recipes are linked yet.<br>'+
-      'Go to <strong>Ingredients</strong> → add your ingredients, then <strong>Recipes</strong> → link ingredients to each product.';
+      'Go to <strong>Ingredients</strong> &rarr; add your ingredients, then <strong>Recipes</strong> &rarr; link ingredients to each product.';
     profBar.appendChild(tip);
   }
 
@@ -559,8 +655,8 @@ function renderOverview(main,fs,fe,rev,exp,net){
       '</div>':'';
     tip.innerHTML='<strong style="color:var(--ac);font-size:14px">👋 Welcome! Here\'s how to get started:</strong><br>'+
       '<div style="margin-top:8px;display:flex;flex-direction:column;gap:6px">'+
-      '<div>1️⃣ <strong>Add products</strong> in the POS app (tap Inventory → + Add)</div>'+
-      '<div>2️⃣ <strong>Sync to cloud</strong> — POS → Admin → Sync now</div>'+
+      '<div>1️⃣ <strong>Add products</strong> in the POS app (tap Inventory &rarr; + Add)</div>'+
+      '<div>2️⃣ <strong>Sync to cloud</strong> — POS &rarr; Admin &rarr; Sync now</div>'+
       '<div>3️⃣ <strong>Add employees</strong> here in Employees tab</div>'+
       '<div>4️⃣ <strong>Add ingredients</strong> in Ingredients tab</div>'+
       '<div>5️⃣ <strong>Set recipes</strong> in Recipes tab to track costs</div>'+
@@ -602,11 +698,11 @@ function renderOverview(main,fs,fe,rev,exp,net){
     const cl=el('div','card');
     cl.innerHTML='<div class="card-hd">Setup checklist <span>Complete these to unlock all features</span></div>';
     const steps=[
-      {done:hasProducts,label:'Add products in POS app',sub:'POS → Inventory → + Add product',link:'pos'},
-      {done:hasSales,label:'Make your first sale',sub:'POS → tap a product → Checkout',link:'sales'},
-      {done:hasEmployees,label:'Add employees',sub:'Dashboard → Employees → + Add employee',link:'employees'},
-      {done:hasIngredients,label:'Add ingredients',sub:'Dashboard → Ingredients → + Add ingredient',link:'ingredients'},
-      {done:hasRecipes,label:'Set up recipes',sub:'Dashboard → Recipes → link ingredients to products',link:'recipes'},
+      {done:hasProducts,label:'Add products in POS app',sub:'POS &rarr; Inventory &rarr; + Add product',link:'pos'},
+      {done:hasSales,label:'Make your first sale',sub:'POS &rarr; tap a product &rarr; Checkout',link:'sales'},
+      {done:hasEmployees,label:'Add employees',sub:'Dashboard &rarr; Employees &rarr; + Add employee',link:'employees'},
+      {done:hasIngredients,label:'Add ingredients',sub:'Dashboard &rarr; Ingredients &rarr; + Add ingredient',link:'ingredients'},
+      {done:hasRecipes,label:'Set up recipes',sub:'Dashboard &rarr; Recipes &rarr; link ingredients to products',link:'recipes'},
     ];
     steps.forEach(function(s){
       const r=el('div','row');
@@ -712,73 +808,266 @@ function renderProducts(main){
 
 function renderEmployees(main,fs){
   main.appendChild(el('div','page-title','Employees'));
-  main.appendChild(filterBar());
-  const todayAtt=D.attendance.filter(function(a){return new Date(a.date).toDateString()===new Date().toDateString();});
+
+  const now=new Date();
+  const todayStr=now.toISOString().slice(0,10);
+  const todayAtt=D.attendance.filter(function(a){return a.date===todayStr||new Date(a.date).toDateString()===now.toDateString();});
+  const clockedInNow=todayAtt.filter(function(a){return a.time_in&&!a.time_out;}).length;
+  const completedToday=todayAtt.filter(function(a){return a.time_in&&a.time_out;}).length;
+  const totalHrsToday=todayAtt.reduce(function(a,r){return a+(r.hours_worked||0);},0);
+
+  // Period attendance for stats
   const fAtt=D.attendance.filter(function(a){
-    const d=new Date(a.date);const now=new Date();
+    const d=new Date(a.date);
     if(UI.filter==='today')return d.toDateString()===now.toDateString();
     if(UI.filter==='week'){const w=new Date(now);w.setDate(w.getDate()-7);return d>=w;}
     if(UI.filter==='month'){const m=new Date(now);m.setDate(m.getDate()-30);return d>=m;}
     return true;
   });
   const totalHrs=fAtt.reduce(function(a,r){return a+(r.hours_worked||0);},0);
+
+  // --- Stats row ---
   const sg=el('div','stats-grid');
-  sg.appendChild(statCard('Employees',D.employees.length,'',''));
-  sg.appendChild(statCard('Clocked in today',todayAtt.filter(function(a){return!a.time_out;}).length,'','blue'));
-  sg.appendChild(statCard('Hours worked',totalHrs.toFixed(1)+'h','this period','green'));
+  sg.appendChild(statCard('Team size',D.employees.length,'employees',''));
+  sg.appendChild(statCard('On shift now',clockedInNow,'clocked in','green'));
+  sg.appendChild(statCard('Hours today',totalHrsToday.toFixed(1)+'h','completed shifts','blue'));
   sg.appendChild(statCard('Active loans',D.loans.filter(function(l){return l.status==='active';}).length,'','amber'));
   main.appendChild(sg);
-  const empCard=el('div','card');
-  const empHd=el('div','card-hd','Employees');
+
+  // ============================================================
+  // TODAY'S SHIFT BOARD
+  // ============================================================
+  const shiftCard=el('div','card');
+  const shiftHd=el('div','shift-header');
+  shiftHd.innerHTML='<div class="card-hd" style="margin:0">Today\'s Shift Board</div>'
+    +'<div class="shift-date">'+now.toLocaleDateString('en-PH',{weekday:'long',month:'long',day:'numeric',year:'numeric'})+'</div>';
+  shiftCard.appendChild(shiftHd);
+
+  // Summary pills
+  const sumRow=el('div','shift-summary');
+  sumRow.innerHTML='<div class="shift-pill in"><span class="shift-dot"></span>'+clockedInNow+' On shift</div>'
+    +'<div class="shift-pill out"><span class="shift-dot"></span>'+completedToday+' Completed</div>'
+    +(D.employees.length-clockedInNow-completedToday>0?'<div class="shift-pill out"><span class="shift-dot"></span>'+(D.employees.length-clockedInNow-completedToday)+' Not in yet</div>':'')
+    +'<div class="shift-pill total"><i class="ti ti-clock" style="font-size:12px"></i>'+totalHrsToday.toFixed(1)+'h total today</div>';
+  shiftCard.appendChild(sumRow);
+
+  if(!D.employees.length){
+    shiftCard.appendChild(el('div','empty','No employees yet'));
+  } else {
+    // Sort: clocked-in first, then completed, then absent
+    const sorted=D.employees.slice().sort(function(a,b){
+      const aAtt=todayAtt.filter(function(x){return x.employee_id===a.id;});
+      const bAtt=todayAtt.filter(function(x){return x.employee_id===b.id;});
+      const aIn=aAtt.some(function(x){return x.time_in&&!x.time_out;});
+      const bIn=bAtt.some(function(x){return x.time_in&&!x.time_out;});
+      const aDone=aAtt.some(function(x){return x.time_in&&x.time_out;});
+      const bDone=bAtt.some(function(x){return x.time_in&&x.time_out;});
+      if(aIn&&!bIn)return -1;if(!aIn&&bIn)return 1;
+      if(aDone&&!bDone)return -1;if(!aDone&&bDone)return 1;
+      return a.name.localeCompare(b.name);
+    });
+
+    sorted.forEach(function(e){
+      const empAtt=todayAtt.filter(function(a){return a.employee_id===e.id;});
+      const activeShift=empAtt.find(function(a){return a.time_in&&!a.time_out;});
+      const lastShift=empAtt.filter(function(a){return a.time_in&&a.time_out;}).sort(function(a,b){return new Date(b.time_in)-new Date(a.time_in);})[0];
+      const isClockedIn=!!activeShift;
+      const hasDone=!!lastShift;
+
+      const row=el('div','shift-row '+(isClockedIn?'clocked-in':'clocked-out'));
+      const av=el('div','shift-av '+(isClockedIn?'in':'out'),(e.name||'?')[0].toUpperCase());
+      const info=el('div','shift-info');
+      const timesEl=el('div','shift-times');
+
+      if(isClockedIn){
+        const inTime=new Date(activeShift.time_in);
+        const elapsed=Math.floor((now-inTime)/60000);
+        const elapsedStr=elapsed>=60?(Math.floor(elapsed/60)+'h '+(elapsed%60)+'m'):elapsed+'m';
+        timesEl.innerHTML='<div class="shift-time-in"><i class="ti ti-login"></i>'+ft(activeShift.time_in)+'</div>'
+          +'<span class="shift-sep">&rarr;</span>'
+          +'<span class="att-active-badge">&#9679; Active '+elapsedStr+'</span>';
+      } else if(hasDone){
+        timesEl.innerHTML='<div class="shift-time-in"><i class="ti ti-login"></i>'+ft(lastShift.time_in)+'</div>'
+          +'<span class="shift-sep">&rarr;</span>'
+          +'<div class="shift-time-out"><i class="ti ti-logout"></i>'+ft(lastShift.time_out)+'</div>';
+      } else {
+        timesEl.innerHTML='<span class="shift-noshow">No shift recorded today</span>';
+      }
+
+      // All shifts today (multiple clock-ins)
+      const allShiftsToday=empAtt.filter(function(a){return a.time_in&&a.time_out;});
+      const totalEmpHrs=empAtt.reduce(function(a,r){return a+(r.hours_worked||0);},0);
+
+      info.innerHTML='<div class="shift-name">'+e.name+'</div><div class="shift-role">'+e.role+'</div>';
+      info.appendChild(timesEl);
+      if(allShiftsToday.length>1){
+        const multi=el('div','shift-duration');multi.textContent=allShiftsToday.length+' shifts today';
+        info.appendChild(multi);
+      }
+
+      const hrs=el('div','shift-hrs '+(isClockedIn?'active':hasDone?'done':'none'));
+      if(isClockedIn){
+        const elapsed=Math.floor((now-new Date(activeShift.time_in))/3600000*10)/10;
+        hrs.textContent=elapsed.toFixed(1)+'h+';
+      } else if(totalEmpHrs>0){
+        hrs.textContent=totalEmpHrs.toFixed(1)+'h';
+      } else {
+        hrs.textContent='—';
+      }
+
+      // Click to view employee's full att history
+      row.style.cursor='pointer';
+      row.onclick=function(){UI.modal={type:'empAtt',item:e};render();};
+      row.appendChild(av);row.appendChild(info);row.appendChild(hrs);
+      shiftCard.appendChild(row);
+    });
+
+    const hint=el('div','');
+    hint.style.cssText='font-size:11px;color:var(--t3);text-align:center;padding:8px 0 0;';
+    hint.textContent='Tap any employee to view their full attendance history';
+    shiftCard.appendChild(hint);
+  }
+  main.appendChild(shiftCard);
+
+  // ============================================================
+  // EMPLOYEE LIST (manage)
+  // ============================================================
+  const empSec=el('div','card');
+  const empHd=el('div','card-hd','Team');
   empHd.appendChild(addBtn('+ Add employee',function(){UI.modal={type:'emp',item:null};render();}));
-  empCard.appendChild(empHd);
-  if(!D.employees.length)empCard.appendChild(el('div','empty','No employees yet — add your first one'));
-  D.employees.forEach(function(e){
-    const payLabel=e.pay_type==='hourly'?'PHP '+e.rate+'/hr':e.pay_type==='daily'?'PHP '+e.rate+'/day':e.pay_type==='monthly'?'PHP '+Number(e.rate).toLocaleString()+'/mo':e.commission_pct+'% commission';
-    const card=el('div','emp-card');card.style.marginBottom='10px';
-    const av=el('div','emp-av',(e.name||'?')[0].toUpperCase());
-    const info=el('div','emp-info');
-    info.innerHTML='<div class="emp-name">'+e.name+'</div><div class="emp-role">'+e.role+'</div><div class="emp-pay"><span class="badge b-blue" style="font-size:10px">'+e.pay_type.toUpperCase()+'</span> '+payLabel+'</div>';
-    const btns=el('div','emp-btns');
-    function smBtn(lbl,fn){const b=el('button','sm-btn',lbl);b.onclick=fn;return b;}
-    btns.appendChild(smBtn('Attendance',function(){UI.modal={type:'empAtt',item:e};render();}));
-    btns.appendChild(smBtn('Payslip',function(){UI.modal={type:'payslip',item:e};render();}));
-    btns.appendChild(smBtn('Loan',function(){UI.modal={type:'loan',item:null,emp:e};render();}));
-    btns.appendChild(smBtn('Leave',function(){UI.modal={type:'leave',item:null,emp:e};render();}));
-    btns.appendChild(smBtn('Edit',function(){UI.modal={type:'emp',item:e};render();}));
-    info.appendChild(btns);card.appendChild(av);card.appendChild(info);empCard.appendChild(card);
-  });
-  main.appendChild(empCard);
-  const attCard=el('div','card');attCard.innerHTML='<div class="card-hd">Attendance log <span>'+fAtt.length+' records</span></div>';
-  fAtt.slice(0,20).forEach(function(a){
-    const in2=a.time_in&&!a.time_out;
-    const r=el('div','row');
-    r.innerHTML='<div style="width:8px;height:8px;border-radius:50%;background:'+(in2?'var(--st)':'var(--t3)')+';flex-shrink:0"></div><div class="row-l" style="margin-left:8px"><div class="row-name">'+a.employee_name+'</div><div class="row-sub">'+fd(a.date)+' · In: '+ft(a.time_in)+(a.time_out?' · Out: '+ft(a.time_out):'')+'</div></div><div style="font-weight:700;color:var(--ac)">'+(a.hours_worked?a.hours_worked.toFixed(1)+'h':in2?'Active':'—')+'</div>';
-    attCard.appendChild(r);
-  });
-  if(!fAtt.length)attCard.appendChild(el('div','empty','No attendance records'));
-  main.appendChild(attCard);
+  empSec.appendChild(empHd);
+
+  if(!D.employees.length){
+    empSec.appendChild(el('div','empty','No employees yet — add your first one'));
+  } else {
+    const grid=el('div','emp-grid');
+    D.employees.forEach(function(e){
+      const empAtt=todayAtt.filter(function(a){return a.employee_id===e.id;});
+      const isClockedIn=empAtt.some(function(a){return a.time_in&&!a.time_out;});
+      const activeShift=empAtt.find(function(a){return a.time_in&&!a.time_out;});
+      const payLabel=e.pay_type==='hourly'?'PHP '+e.rate+'/hr'
+        :e.pay_type==='daily'?'PHP '+e.rate+'/day'
+        :e.pay_type==='monthly'?'PHP '+Number(e.rate).toLocaleString()+'/mo'
+        :e.commission_pct+'% commission';
+
+      const card=el('div','emp-card2');
+      const head=el('div','emp-head');
+      const av=el('div','emp-av2',(e.name||'?')[0].toUpperCase());
+      const meta=el('div','emp-meta');
+      meta.innerHTML='<div class="emp-name2">'+e.name+'</div>'
+        +'<div class="emp-role2">'
+        +'<span class="emp-status-dot '+(isClockedIn?'in':'out')+'"></span>'
+        +'<span style="font-size:11px;color:var(--t3)">'+e.role+'</span>'
+        +(isClockedIn&&activeShift?'<span style="font-size:10px;font-weight:700;color:var(--st);background:rgba(63,185,80,0.1);padding:1px 7px;border-radius:20px;border:1px solid rgba(63,185,80,0.2)">IN '+ft(activeShift.time_in)+'</span>':'')
+        +'</div>';
+      head.appendChild(av);head.appendChild(meta);
+      const pay=el('div','emp-pay2',payLabel);
+      const actions=el('div','emp-actions');
+      function smBtn(lbl,fn){const b=el('button','sm-btn',lbl);b.onclick=fn;return b;}
+      actions.appendChild(smBtn('History',function(){UI.modal={type:'empAtt',item:e};render();}));
+      actions.appendChild(smBtn('Payslip',function(){UI.modal={type:'payslip',item:e};render();}));
+      actions.appendChild(smBtn('Loan',function(){UI.modal={type:'loan',item:null,emp:e};render();}));
+      actions.appendChild(smBtn('Edit',function(){UI.modal={type:'emp',item:e};render();}));
+      card.appendChild(head);card.appendChild(pay);card.appendChild(actions);
+      grid.appendChild(card);
+    });
+    empSec.appendChild(grid);
+  }
+  main.appendChild(empSec);
+
+  // ============================================================
+  // ATTENDANCE HISTORY (period)
+  // ============================================================
+  main.appendChild(filterBar());
+  const attSec=el('div','card');
+  const attHd=el('div','card-hd');
+  attHd.innerHTML='Attendance history <span>'+fAtt.length+' records · '+totalHrs.toFixed(1)+'h total</span>';
+  attSec.appendChild(attHd);
+
+  if(!fAtt.length){
+    attSec.appendChild(el('div','empty','No attendance records for this period'));
+  } else {
+    // Group by date descending
+    const byDate={};
+    fAtt.forEach(function(a){
+      const k=new Date(a.date).toDateString();
+      if(!byDate[k])byDate[k]=[];
+      byDate[k].push(a);
+    });
+    const dateKeys=Object.keys(byDate).sort(function(a,b){return new Date(b)-new Date(a);});
+    dateKeys.slice(0,14).forEach(function(dateStr){
+      const records=byDate[dateStr];
+      const y=new Date(now);y.setDate(y.getDate()-1);
+      const lbl=dateStr===now.toDateString()?'Today'
+        :dateStr===y.toDateString()?'Yesterday'
+        :new Date(dateStr).toLocaleDateString('en-PH',{weekday:'short',month:'short',day:'numeric'});
+      const dayHrs=records.reduce(function(a,r){return a+(r.hours_worked||0);},0);
+      const dayGroup=el('div','att-day-group');
+      const dayLbl=el('div','att-day-label');
+      dayLbl.innerHTML=lbl
+        +'<span style="font-size:11px;color:var(--ac);font-weight:600;letter-spacing:0">'+(dayHrs>0?dayHrs.toFixed(1)+'h':'')+'</span>';
+      dayGroup.appendChild(dayLbl);
+      records.sort(function(a,b){return new Date(a.time_in)-new Date(b.time_in);}).forEach(function(a){
+        const isActive=a.time_in&&!a.time_out;
+        const row=el('div','att-row2');
+        const avatar=el('div','att-avatar',(a.employee_name||'?')[0].toUpperCase());
+        const info=el('div','att-info');
+        const times=el('div','att-times');
+        if(a.time_in){times.innerHTML+='<div class="att-time-block"><i class="ti ti-login" style="color:var(--st)"></i><span>'+ft(a.time_in)+'</span></div>';}
+        if(a.time_in){times.innerHTML+='<span class="att-arrow">&rarr;</span>';}
+        if(a.time_out){times.innerHTML+='<div class="att-time-block"><i class="ti ti-logout" style="color:var(--t3)"></i><span>'+ft(a.time_out)+'</span></div>';}
+        else if(isActive){times.innerHTML+='<span class="att-active-badge">&#9679; Active</span>';}
+        info.innerHTML='<div class="att-name2">'+a.employee_name+'</div>';
+        info.appendChild(times);
+        const hrs=el('div','att-hours'+(isActive?' active':''));
+        hrs.textContent=a.hours_worked?a.hours_worked.toFixed(1)+'h':isActive?'-':'-';
+        row.appendChild(avatar);row.appendChild(info);row.appendChild(hrs);
+        dayGroup.appendChild(row);
+      });
+      attSec.appendChild(dayGroup);
+    });
+    if(dateKeys.length>14){
+      const more=el('div','');more.style.cssText='text-align:center;font-size:12px;color:var(--t3);padding:8px 0';
+      more.textContent='Showing 14 days — use filter to narrow down';
+      attSec.appendChild(more);
+    }
+  }
+  main.appendChild(attSec);
+
+  // --- Loans ---
   const activeLoans=D.loans.filter(function(l){return l.status==='active';});
   const loanCard=el('div','card');
-  const lhd=el('div','card-hd','Loans / cash advances');lhd.appendChild(addBtn('+ New loan',function(){UI.modal={type:'loan',item:null,emp:null};render();}));loanCard.appendChild(lhd);
+  const lhd=el('div','card-hd','Loans / cash advances');
+  lhd.appendChild(addBtn('+ New loan',function(){UI.modal={type:'loan',item:null,emp:null};render();}));
+  loanCard.appendChild(lhd);
   activeLoans.forEach(function(l){
-    const r=el('div','row');r.innerHTML='<div class="row-l"><div class="row-name">'+l.employee_name+'</div><div class="row-sub">'+fd(l.date)+' · '+l.reason+'</div></div><div class="row-r"><div style="font-weight:700;color:var(--wt)">'+fmt(l.balance)+' left</div><div style="font-size:11px;color:var(--t3)">of '+fmt(l.amount)+'</div></div>';
+    const r=el('div','row');
+    r.innerHTML='<div class="row-l"><div class="row-name">'+l.employee_name+'</div><div class="row-sub">'+fd(l.date)+' · '+l.reason+'</div></div>'
+      +'<div class="row-r"><div style="font-weight:700;color:var(--wt)">'+fmt(l.balance)+' left</div><div style="font-size:11px;color:var(--t3)">of '+fmt(l.amount)+'</div></div>';
     loanCard.appendChild(r);
   });
   if(!activeLoans.length)loanCard.appendChild(el('div','empty','No active loans'));
   main.appendChild(loanCard);
+
+  // --- Leave Requests ---
   const pendLeaves=D.leaves.filter(function(l){return l.status==='pending';});
   const leaveCard=el('div','card');
   const leavehd=el('div','card-hd','Leave requests'+(pendLeaves.length?' <span style="background:var(--wg);color:var(--wt);padding:2px 8px;border-radius:20px;font-size:11px">'+pendLeaves.length+' pending</span>':''));
-  leavehd.appendChild(addBtn('+ New request',function(){UI.modal={type:'leave',item:null,emp:null};render();}));leaveCard.appendChild(leavehd);
+  leavehd.appendChild(addBtn('+ New request',function(){UI.modal={type:'leave',item:null,emp:null};render();}));
+  leaveCard.appendChild(leavehd);
   D.leaves.slice(0,10).forEach(function(l){
     const scls={pending:'b-amber',approved:'b-green',rejected:'b-red'}[l.status]||'b-gray';
     const r=el('div','row');
-    r.innerHTML='<div class="row-l"><div class="row-name">'+l.employee_name+'</div><div class="row-sub">'+l.type.toUpperCase()+' · '+fd(l.date_from)+' to '+fd(l.date_to)+' ('+l.days+'d)</div></div><div class="row-r"><span class="badge '+scls+'">'+l.status.toUpperCase()+'</span>'+(l.status==='pending'?'<button class="sm-btn" onclick="api(\'/rest/v1/leaves?id=eq.'+l.id+'\',{method:\'PATCH\',body:JSON.stringify({status:\'approved\'})}).then(loadData)">Approve</button>':'')+'</div>';
+    r.innerHTML='<div class="row-l"><div class="row-name">'+l.employee_name+'</div><div class="row-sub">'+l.type.toUpperCase()+' · '+fd(l.date_from)+' to '+fd(l.date_to)+' ('+l.days+'d)</div></div>'
+      +'<div class="row-r"><span class="badge '+scls+'">'+l.status.toUpperCase()+'</span>'
+      +(l.status==='pending'?'<button class="sm-btn" onclick="api(\'/rest/v1/leaves?id=eq.'+l.id+'\',{method:\'PATCH\',body:JSON.stringify({status:\'approved\'})}).then(loadData)">Approve</button>':'')
+      +'</div>';
     leaveCard.appendChild(r);
   });
   if(!D.leaves.length)leaveCard.appendChild(el('div','empty','No leave requests'));
   main.appendChild(leaveCard);
+
+  // --- Sales Performance ---
   const salesByEmp={};
   D.sales.filter(function(s){return!s.voided&&s.cashier;}).forEach(function(s){
     if(!salesByEmp[s.cashier])salesByEmp[s.cashier]={name:s.cashier,txns:0,rev:0};
@@ -788,11 +1077,14 @@ function renderEmployees(main,fs){
   if(empSales.length){
     const sc=el('div','card');sc.innerHTML='<div class="card-hd">Sales performance</div>';
     empSales.forEach(function(e,i){
-      const item=el('div','top-item');item.innerHTML='<div class="top-rank">'+(i+1)+'</div><div class="top-info"><div class="top-name">'+e.name+'</div><div class="top-sub">'+e.txns+' transactions</div></div><div class="top-val">'+fmt(e.rev)+'</div>';sc.appendChild(item);
+      const item=el('div','top-item');
+      item.innerHTML='<div class="top-rank">'+(i+1)+'</div><div class="top-info"><div class="top-name">'+e.name+'</div><div class="top-sub">'+e.txns+' transactions</div></div><div class="top-val">'+fmt(e.rev)+'</div>';
+      sc.appendChild(item);
     });
     main.appendChild(sc);
   }
 }
+
 
 function renderCustomers(main){
   main.appendChild(el('div','page-title','Customers'));
@@ -944,7 +1236,7 @@ function renderRecipes(main){
     }
     main.appendChild(card);
   });
-  if(!D.products.length)main.appendChild(el('div','empty','No products found — sync products from the POS app first (Admin → Sync now)'));
+  if(!D.products.length)main.appendChild(el('div','empty','No products found — sync products from the POS app first (Admin &rarr; Sync now)'));
 }
 
 function renderIngredients(main){
@@ -1268,14 +1560,56 @@ function renderModal(root){
     },isNew?'Add':'Save',it.id?function(){if(confirm('Remove '+it.name+'?'))api('/rest/v1/employees?id=eq.'+it.id,{method:'PATCH',body:JSON.stringify({active:false})}).then(loadData);close();}:null);
 
   } else if(m.type==='empAtt'){
-    const e=m.item;box.appendChild(el('div','modal-title','Attendance — '+e.name));
-    const att=D.attendance.filter(function(a){return a.employee_id===e.id;}).slice(0,20);
+    const e=m.item;
+    box.appendChild(el('div','modal-title',e.name+' — Attendance'));
+    const att=D.attendance.filter(function(a){return a.employee_id===e.id;})
+      .sort(function(a,b){return new Date(b.time_in)-new Date(a.time_in);});
+    // Summary stats
+    const totalDays=new Set(att.map(function(a){return a.date;})).size;
+    const totalHrsEmp=att.reduce(function(s,a){return s+(a.hours_worked||0);},0);
+    const statsRow=el('div','');
+    statsRow.style.cssText='display:flex;gap:8px;flex-wrap:wrap;margin-bottom:14px';
+    statsRow.innerHTML='<div style="padding:8px 14px;background:var(--bg2);border-radius:8px;border:1px solid var(--b1);flex:1;min-width:80px;text-align:center">'
+      +'<div style="font-size:18px;font-weight:800;color:var(--ac)">'+totalDays+'</div>'
+      +'<div style="font-size:10px;color:var(--t3);text-transform:uppercase;letter-spacing:.5px">Days</div></div>'
+      +'<div style="padding:8px 14px;background:var(--bg2);border-radius:8px;border:1px solid var(--b1);flex:1;min-width:80px;text-align:center">'
+      +'<div style="font-size:18px;font-weight:800;color:var(--st)">'+totalHrsEmp.toFixed(1)+'h</div>'
+      +'<div style="font-size:10px;color:var(--t3);text-transform:uppercase;letter-spacing:.5px">Total hrs</div></div>'
+      +'<div style="padding:8px 14px;background:var(--bg2);border-radius:8px;border:1px solid var(--b1);flex:1;min-width:80px;text-align:center">'
+      +'<div style="font-size:18px;font-weight:800;color:var(--wt)">'+(totalDays>0?(totalHrsEmp/totalDays).toFixed(1)+'h':'—')+'</div>'
+      +'<div style="font-size:10px;color:var(--t3);text-transform:uppercase;letter-spacing:.5px">Avg/day</div></div>';
+    box.appendChild(statsRow);
     if(!att.length){box.appendChild(el('div','empty','No records yet'));}
     else{
-      const tbl=el('table','tbl','<thead><tr><th>Date</th><th>In</th><th>Out</th><th>Hours</th></tr></thead>');
-      const tb=document.createElement('tbody');
-      att.forEach(function(a){const tr=document.createElement('tr');tr.innerHTML='<td>'+fd(a.date)+'</td><td>'+ft(a.time_in)+'</td><td>'+(a.time_out?ft(a.time_out):'<span style="color:var(--st)">Active</span>')+'</td><td>'+(a.hours_worked?a.hours_worked.toFixed(1)+'h':'—')+'</td>';tb.appendChild(tr);});
-      tbl.appendChild(tb);box.appendChild(tbl);
+      // Group by date
+      const byDate={};
+      att.forEach(function(a){
+        const k=new Date(a.date).toDateString();
+        if(!byDate[k])byDate[k]=[];
+        byDate[k].push(a);
+      });
+      Object.entries(byDate).slice(0,30).forEach(function(entry){
+        const dateStr=entry[0];const records=entry[1];
+        const dayHrs=records.reduce(function(s,a){return s+(a.hours_worked||0);},0);
+        const grp=el('div','');grp.style.marginBottom='12px';
+        const lbl=el('div','');
+        lbl.style.cssText='font-size:10px;font-weight:700;color:var(--t3);text-transform:uppercase;letter-spacing:.8px;margin-bottom:6px;display:flex;justify-content:space-between';
+        lbl.innerHTML='<span>'+new Date(dateStr).toLocaleDateString('en-PH',{weekday:'short',month:'short',day:'numeric'})+'</span>'
+          +(dayHrs>0?'<span style="color:var(--ac)">'+dayHrs.toFixed(1)+'h</span>':'');
+        grp.appendChild(lbl);
+        records.forEach(function(a){
+          const isActive=a.time_in&&!a.time_out;
+          const r=el('div','emp-hist-row');
+          r.innerHTML='<div class="emp-hist-times" style="display:flex;align-items:center;gap:8px">'
+            +'<span style="font-size:12px;color:var(--st);font-weight:600;display:flex;align-items:center;gap:3px"><i class="ti ti-login"></i>'+ft(a.time_in)+'</span>'
+            +'<span style="color:var(--t3);font-size:11px">&rarr;</span>'
+            +(a.time_out?'<span style="font-size:12px;color:var(--t2);font-weight:600;display:flex;align-items:center;gap:3px"><i class="ti ti-logout"></i>'+ft(a.time_out)+'</span>':'<span class="att-active-badge">&#9679; Active</span>')
+            +'</div>'
+            +'<div class="emp-hist-hrs">'+(a.hours_worked?a.hours_worked.toFixed(1)+'h':isActive?'-':'-')+'</div>';
+          grp.appendChild(r);
+        });
+        box.appendChild(grp);
+      });
     }
     const btns=el('div','modal-btns');const cb=el('button','','Close');cb.onclick=close;btns.appendChild(cb);box.appendChild(btns);
 
@@ -1459,7 +1793,7 @@ function renderModal(root){
     calcResult.style.cssText='font-size:13px;color:var(--t2);background:var(--bg3);border-radius:8px;padding:10px 12px;line-height:1.8;display:none';
     calcCard.appendChild(calcResult);
 
-    const calcBtn=el('button','add-btn','Calculate →');
+    const calcBtn=el('button','add-btn','Calculate &rarr;');
     calcBtn.style.cssText='width:100%;padding:10px;margin-top:4px';
     calcBtn.onclick=function(){
       const qty=parseFloat(document.getElementById('cQty').value)||0;
@@ -1477,7 +1811,7 @@ function renderModal(root){
       calcResult.innerHTML=
         '📦 <strong style="color:var(--t1)">'+stockInBase.toLocaleString()+' '+baseUnit+'</strong> total stock<br>'+
         '💰 <strong style="color:var(--st)">PHP '+costPerBase.toFixed(4)+'</strong> per '+baseUnit+'<br>'+
-        '<span style="color:var(--ac);cursor:pointer;font-weight:600" id="applyCalc">→ Apply these values</span>';
+        '<span style="color:var(--ac);cursor:pointer;font-weight:600" id="applyCalc">&rarr; Apply these values</span>';
       document.getElementById('applyCalc').onclick=function(){
         const stockEl=document.getElementById('iStock');if(stockEl)stockEl.value=stockInBase;
         const costEl=document.getElementById('iCost');if(costEl)costEl.value=costPerBase.toFixed(4);
@@ -1549,24 +1883,59 @@ function exportCSV(sales){
 }
 
 if(loadSession()){
-  // Always re-verify bizId using auth token (fixes stale/wrong bizId from old sessions)
   (async function(){
     try{
-      const r=await fetch(SB_URL+'/rest/v1/businesses?user_id=eq.'+SESSION.user,{
-        headers:{'apikey':SB_KEY,'Authorization':'Bearer '+SESSION.token,'Content-Type':'application/json'}
-      });
+      const headers={'apikey':SB_KEY,'Authorization':'Bearer '+SESSION.token,'Content-Type':'application/json'};
+      // STEP 1: Try to read the POS session from localStorage - this is the authoritative bizId
+      let posBizId=null;
+      try{
+        const posCloud=JSON.parse(localStorage.getItem('arroyo_cloud')||'{}');
+        if(posCloud&&posCloud.bizId)posBizId=posCloud.bizId;
+        console.log('[ArroyoDash] POS bizId from localStorage:',posBizId);
+      }catch(e){}
+      // STEP 2: Get all businesses for this user
+      const r=await fetch(SB_URL+'/rest/v1/businesses?user_id=eq.'+SESSION.user+'&order=created_at.asc',{headers});
       if(r.ok){
-        const bizData=await r.json();
-        if(bizData&&bizData[0]){
-          if(SESSION.bizId!==bizData[0].id){
-            console.log('[ArroyoDash] BizId corrected from',SESSION.bizId,'to',bizData[0].id);
-            SESSION.bizId=bizData[0].id;
-            SESSION.bizName=bizData[0].name;
-            saveSession();
+        const bizList=await r.json();
+        console.log('[ArroyoDash] Businesses found:',bizList&&bizList.length);
+        if(bizList&&bizList.length>0){
+          let correctBiz=bizList[0];
+          // Priority 1: Use the bizId that matches the POS session
+          if(posBizId){
+            const match=bizList.find(function(b){return b.id===posBizId;});
+            if(match){correctBiz=match;console.log('[ArroyoDash] Matched POS bizId:',correctBiz.id);}
+          }
+          // Priority 2: Pick the biz with the most data (sales OR employees)
+          if(!posBizId&&bizList.length>1){
+            let bestScore=0;
+            for(const b of bizList){
+              let score=0;
+              const sr=await fetch(SB_URL+'/rest/v1/sales?biz_id=eq.'+b.id+'&limit=1',{headers});
+              if(sr.ok){const sd=await sr.json();if(sd&&sd.length>0)score+=10;}
+              const er=await fetch(SB_URL+'/rest/v1/employees?biz_id=eq.'+b.id+'&limit=1',{headers});
+              if(er.ok){const ed=await er.json();if(ed&&ed.length>0)score+=5;}
+              if(score>bestScore){bestScore=score;correctBiz=b;}
+            }
+            console.log('[ArroyoDash] Best biz by data score:',correctBiz.id,correctBiz.name);
+          }
+          if(SESSION.bizId!==correctBiz.id){
+            console.log('[ArroyoDash] BizId corrected:',SESSION.bizId,'&rarr;',correctBiz.id);
+            // STEP 3: Migrate employees/data from old bizId to correct bizId
+            if(SESSION.bizId&&SESSION.bizId!==correctBiz.id){
+              try{
+                // Move employees from old biz to correct biz
+                await fetch(SB_URL+'/rest/v1/employees?biz_id=eq.'+SESSION.bizId,{
+                  method:'PATCH',headers:{...headers,'Prefer':'return=representation'},
+                  body:JSON.stringify({biz_id:correctBiz.id})
+                });
+                console.log('[ArroyoDash] Migrated employees to correct bizId');
+              }catch(e){console.warn('Migration failed:',e);}
+            }
+            SESSION.bizId=correctBiz.id;SESSION.bizName=correctBiz.name;saveSession();
           }
         }
       }
-    }catch(e){console.warn('[ArroyoDash] BizId re-verify failed:',e);}
+    }catch(e){console.warn('[ArroyoDash] BizId check failed:',e);}
     loadData();
   })();
 }else{render();}
