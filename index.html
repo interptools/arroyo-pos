@@ -1287,11 +1287,10 @@ function renderAtt(scr){
     btn.textContent=e.clockedIn?'Clock Out':'Clock In';
     btn.onclick=async function(){
       btn.disabled=true;btn.style.opacity='0.5';
-      const h2={...H,'Authorization':'Bearer '+CLOUD.token,'Prefer':'return=representation'};
+      const h2={...H,'Prefer':'return=representation'};
       const today=new Date().toISOString().slice(0,10);
       if(e.clockedIn){
         // Clock out
-        const attRes=await fetch(SUPA_URL+'/rest/v1/attendance?biz_id=eq.'+CLOUD.bizId+'&employee_id=eq.'+e.id+'&date=eq.'+today+'&time_out=is.null&order=time_in.desc&limit=1',{headers:h2});
         const attData=await attRes.json();
         if(attData&&attData[0]){
           const timeIn=new Date(attData[0].time_in);const timeOut=new Date();
@@ -1348,7 +1347,8 @@ async function loadAttEmployees(){
     }catch(e){toast('Could not find business');return;}
   }
   try{
-    const h2={...H,'Authorization':'Bearer '+CLOUD.token};
+    // Use anon key headers for reading employees (public business data)
+    const h2={...H};
     const today=new Date().toISOString().slice(0,10);
     const empRes=await fetch(SUPA_URL+'/rest/v1/employees?biz_id=eq.'+CLOUD.bizId+'&order=name',{headers:h2});
     const emps=await empRes.json();
