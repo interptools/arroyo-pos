@@ -1408,17 +1408,62 @@ function renderModal(root){
     box.appendChild(el('div','modal-title',isNew?'Add ingredient':'Edit: '+it.name));
     mfField(box,'iName','Name','text',it.name,'e.g. Coffee beans');
     mfField(box,'iUnit','Unit','text',it.unit||'g','g / kg / ml / L / pcs');
-    mfField(box,'iStock','Current stock','number',it.stock,'0');
+
+    // Smart cost calculator
+    const calcCard=el('div','');
+    calcCard.style.cssText='background:var(--bg2);border-radius:10px;padding:14px;border:1px solid var(--b2);display:flex;flex-direction:column;gap:10px';
+    calcCard.innerHTML='<div style="font-size:11px;font-weight:700;color:var(--t3);text-transform:uppercase;letter-spacing:.8px">Cost calculator</div>';
+
+    const calcRow=el('div','');calcRow.style.cssText='display:grid;grid-template-columns:1fr 80px 1fr;gap:8px;align-items:end';
+    const qtyFld=el('div','mf','<label>You bought</label>');
+    const qtyInp=document.createElement('input');qtyInp.type='number';qtyInp.id='cQty';qtyInp.placeholder='e.g. 1';qtyInp.min='0';qtyFld.appendChild(qtyInp);
+    const unitFld2=el('div','mf','<label>Bulk unit</label>');
+    const unitSel2=document.createElement('select');unitSel2.id='cBulkUnit';
+    [{v:'kg',l:'kg'},{v:'g',l:'g'},{v:'L',l:'L'},{v:'ml',l:'ml'},{v:'pcs',l:'pcs'}].forEach(function(o){
+      const op=document.createElement('option');op.value=o.v;op.textContent=o.l;unitSel2.appendChild(op);
+    });
+    unitFld2.appendChild(unitSel2);
+    const priceFld=el('div','mf','<label>Total cost (PHP)</label>');
+    const priceInp=document.createElement('input');priceInp.type='number';priceInp.id='cPrice';priceInp.placeholder='e.g. 2000';priceInp.min='0';priceFld.appendChild(priceInp);
+    calcRow.appendChild(qtyFld);calcRow.appendChild(unitFld2);calcRow.appendChild(priceFld);
+    calcCard.appendChild(calcRow);
+
+    const calcResult=el('div','');calcResult.id='calcResult';
+    calcResult.style.cssText='font-size:13px;color:var(--t2);background:var(--bg3);border-radius:8px;padding:10px 12px;line-height:1.8;display:none';
+    calcCard.appendChild(calcResult);
+
+    const calcBtn=el('button','add-btn','Calculate →');
+    calcBtn.style.cssText='width:100%;padding:10px;margin-top:4px';
+    calcBtn.onclick=function(){
+      const qty=parseFloat(document.getElementById('cQty').value)||0;
+      const bulkUnit=document.getElementById('cBulkUnit').value;
+      const price=parseFloat(document.getElementById('cPrice').value)||0;
+      const baseUnit=(document.getElementById('iUnit')||{}).value||'g';
+      if(!qty||!price){calcResult.style.display='none';return;}
+      const conversions={kg:{g:1000,kg:1,ml:null,L:null},g:{g:1,kg:0.001,ml:null,L:null},L:{ml:1000,L:1,g:null,kg:null},ml:{ml:1,L:0.001,g:null,kg:null},pcs:{pcs:1}};
+      let stockInBase=qty;
+      if(conversions[bulkUnit]&&conversions[bulkUnit][baseUnit]!=null){
+        stockInBase=qty*conversions[bulkUnit][baseUnit];
+      }
+      const costPerBase=price/stockInBase;
+      calcResult.style.display='block';
+      calcResult.innerHTML=
+        '📦 <strong style="color:var(--t1)">'+stockInBase.toLocaleString()+' '+baseUnit+'</strong> total stock<br>'+
+        '💰 <strong style="color:var(--st)">PHP '+costPerBase.toFixed(4)+'</strong> per '+baseUnit+'<br>'+
+        '<span style="color:var(--ac);cursor:pointer;font-weight:600" id="applyCalc">→ Apply these values</span>';
+      document.getElementById('applyCalc').onclick=function(){
+        const stockEl=document.getElementById('iStock');if(stockEl)stockEl.value=stockInBase;
+        const costEl=document.getElementById('iCost');if(costEl)costEl.value=costPerBase.toFixed(4);
+        calcResult.innerHTML='<span style="color:var(--st)">✓ Applied! Stock: '+stockInBase.toLocaleString()+' '+baseUnit+' · Cost: PHP '+costPerBase.toFixed(4)+'/'+baseUnit+'</span>';
+      };
+    };
+    calcCard.appendChild(calcBtn);
+    box.appendChild(calcCard);
+
+    mfField(box,'iStock','Current stock (in your unit)','number',it.stock,'0');
     mfField(box,'iThresh','Low stock alert at','number',it.low_threshold||5,'5');
     mfField(box,'iCost','Cost per unit (PHP)','number',it.cost_per_unit,'0');
-    // Show cost calculator hint for new items
-    if(isNew){
-      const hint=el('div','');
-      hint.style.cssText='font-size:12px;color:var(--t2);background:var(--bg2);border-radius:8px;padding:10px 12px;line-height:1.7';
-      hint.innerHTML='<strong style="color:var(--ac)">Tip:</strong> Use small units for accuracy.<br>'+
-        'Example: <strong>Coffee beans</strong> → unit: <strong>g</strong>, stock: <strong>20000</strong> (=20kg), cost per g: <strong>0.10</strong> (=PHP 100/kg)';
-      box.appendChild(hint);
-    }
+
     modalBtns(box,close,async function(){
       const name=gv('iName');
       if(!name){alert('Enter ingredient name');return;}
