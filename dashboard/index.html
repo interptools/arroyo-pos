@@ -9,7 +9,22 @@
 <style>
 *{box-sizing:border-box;margin:0;padding:0}
 :root{--bg:#0f0f0e;--bg1:#1a1a18;--bg2:#222220;--bg3:#2a2a28;--t1:#f0f0ec;--t2:#a8a8a2;--t3:#555552;--b1:rgba(255,255,255,0.08);--b2:rgba(255,255,255,0.14);--ac:#378add;--ac2:#0c447c;--sg:#1a3d08;--st:#a8d070;--wg:#4a2800;--wt:#f0a050;--dg:#4a1010;--dt:#e87070}
-html,body{min-height:100%;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;background:var(--bg);color:var(--t1)}
+/* Mobile top bar */
+.mobile-topbar{display:none;position:fixed;top:0;left:0;right:0;height:52px;background:var(--bg1);border-bottom:1px solid var(--b1);z-index:150;align-items:center;padding:0 14px;gap:12px}
+.hamburger{display:none;background:none;border:none;color:var(--t1);font-size:22px;cursor:pointer;padding:6px;flex-shrink:0}
+.mobile-title{font-size:14px;font-weight:700;flex:1}
+.mobile-biz{font-size:11px;color:var(--t3)}
+/* Overlay */
+.sidebar-overlay{display:none}
+/* Bottom nav */
+.bottom-nav{display:none;position:fixed;bottom:0;left:0;right:0;height:60px;background:var(--bg1);border-top:1px solid var(--b1);z-index:150;justify-content:space-around;align-items:center;padding:0 4px}
+.bnav-item{display:flex;flex-direction:column;align-items:center;gap:2px;padding:6px 8px;cursor:pointer;border-radius:8px;min-width:44px;border:none;background:none;color:var(--t3);transition:color .15s}
+.bnav-item.active{color:var(--ac)}
+.bnav-item i{font-size:20px}
+.bnav-label{font-size:9px;font-weight:600}
+/* Adjust main for mobile topbar */
+@media(max-width:768px){.main{padding-top:64px}}
+font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;background:var(--bg);color:var(--t1)}
 .auth-page{min-height:100vh;display:flex;align-items:center;justify-content:center;padding:24px}
 .auth-card{background:var(--bg1);border:1px solid var(--b2);border-radius:20px;padding:36px 28px;width:100%;max-width:380px;display:flex;flex-direction:column;gap:16px}
 .auth-ico{width:44px;height:44px;border-radius:12px;background:var(--ac);display:flex;align-items:center;justify-content:center;font-size:16px;font-weight:800;color:#fff}
@@ -110,7 +125,37 @@ html,body{min-height:100%;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI
 .modal-btns button{padding:11px 16px;border-radius:10px;border:1px solid var(--b2);background:var(--bg2);color:var(--t1);font-size:13px;font-weight:600;cursor:pointer}
 .modal-btns .pri{background:var(--ac);color:#fff;border-color:var(--ac)}
 .modal-btns .del{color:var(--dt);margin-right:auto}
-@media(max-width:768px){.sidebar{display:none}.main{margin-left:0;padding:16px}.two-col{grid-template-columns:1fr}.stats-grid{grid-template-columns:1fr 1fr}}
+@media(max-width:768px){
+  .sidebar{transform:translateX(-220px);transition:transform .3s;position:fixed;height:100vh;z-index:200}
+  .sidebar.open{transform:translateX(0)}
+  .sidebar-overlay{display:block!important;position:fixed;inset:0;background:rgba(0,0,0,.5);z-index:199;opacity:0;pointer-events:none;transition:opacity .3s}
+  .sidebar-overlay.open{opacity:1;pointer-events:all}
+  .main{margin-left:0;padding:12px;padding-bottom:72px}
+  .two-col{grid-template-columns:1fr}
+  .stats-grid{grid-template-columns:1fr 1fr;gap:10px}
+  .page-title{font-size:18px;margin-bottom:14px}
+  .card{padding:14px;margin-bottom:14px}
+  .card-hd{font-size:13px;margin-bottom:12px;flex-wrap:wrap;gap:6px}
+  .tbl{font-size:12px}
+  .tbl th{font-size:9px;padding:0 0 8px}
+  .tbl td{padding:8px 0}
+  .stat{padding:12px}
+  .stat-v{font-size:20px}
+  .stat-l{font-size:9px}
+  .emp-card{flex-wrap:wrap}
+  .emp-btns{flex-wrap:wrap}
+  .filter-bar{gap:5px}
+  .fp{padding:6px 12px;font-size:11px}
+  .row-name{font-size:13px}
+  .row-sub{font-size:11px}
+  .add-btn{font-size:11px;padding:6px 10px}
+  /* Bottom nav */
+  .bottom-nav{display:flex!important}
+  /* Hamburger */
+  .hamburger{display:flex!important}
+  /* Hide sidebar brand on mobile - shown in topbar instead */
+  .mobile-topbar{display:flex!important}
+}
 </style>
 </head>
 <body>
@@ -288,6 +333,22 @@ function renderAuth(root){
 
 function renderApp(root){
   const app=el('div','app');
+
+  // Mobile overlay
+  const overlay=el('div','sidebar-overlay');
+  overlay.onclick=function(){sb.classList.remove('open');overlay.classList.remove('open');};
+  app.appendChild(overlay);
+
+  // Mobile top bar
+  const mTop=el('div','mobile-topbar');
+  const hamBtn=el('button','hamburger','<i class="ti ti-menu-2"></i>');
+  hamBtn.onclick=function(){sb.classList.toggle('open');overlay.classList.toggle('open');};
+  const mInfo=el('div','');
+  mInfo.innerHTML='<div class="mobile-title">'+SESSION.bizName+'</div><div class="mobile-biz">'+UI.page.charAt(0).toUpperCase()+UI.page.slice(1)+'</div>';
+  const mSync=el('button','add-btn','Sync');mSync.style.cssText='padding:6px 12px;font-size:11px';
+  mSync.onclick=async function(){mSync.textContent='...';await loadData();mSync.textContent='Sync';};
+  mTop.appendChild(hamBtn);mTop.appendChild(mInfo);mTop.appendChild(mSync);
+  app.appendChild(mTop);
   const sb=el('aside','sidebar');
   const brand=el('div','sb-brand');
   brand.innerHTML='<div class="sb-ico">AP</div><div><div class="sb-name">Arroyo POS</div><div class="sb-biz">'+SESSION.bizName+'</div></div>';
@@ -296,7 +357,11 @@ function renderApp(root){
   function navSection(lbl){nav.appendChild(el('div','nav-section',lbl));}
   function navItem(id,icon,lbl){
     const it=el('button','nav-item'+(UI.page===id?' active':''),'<i class="ti '+icon+'"></i>'+lbl);
-    it.onclick=function(){UI.page=id;destroyCharts();render();};nav.appendChild(it);
+    it.onclick=function(){UI.page=id;destroyCharts();
+      // Close sidebar on mobile after tap
+      const sb2=document.querySelector('.sidebar');const ov2=document.querySelector('.sidebar-overlay');
+      if(sb2)sb2.classList.remove('open');if(ov2)ov2.classList.remove('open');
+      render();};nav.appendChild(it);
   }
   navSection('Main');
   navItem('overview','ti-home','Overview');
@@ -340,7 +405,15 @@ function renderApp(root){
   else if(UI.page==='orders'){renderOrders(main);}
   else if(UI.page==='wastage'){renderWastage(main,rev);}
   else if(UI.page==='reports'){renderReports(main,fs,rev,exp,net);}
-  app.appendChild(main);root.appendChild(app);
+  app.appendChild(main);
+  // Bottom navigation for mobile
+  const bnav=el('div','bottom-nav');
+  [{id:'overview',icon:'ti-home',lbl:'Home'},{id:'sales',icon:'ti-receipt',lbl:'Sales'},{id:'employees',icon:'ti-users',lbl:'Staff'},{id:'customers',icon:'ti-heart',lbl:'Customers'},{id:'reports',icon:'ti-chart-bar',lbl:'Reports'}].forEach(function(n){
+    const btn=el('button','bnav-item'+(UI.page===n.id?' active':''),'<i class="ti '+n.icon+'"></i><span class="bnav-label">'+n.lbl+'</span>');
+    btn.onclick=function(){UI.page=n.id;destroyCharts();render();};bnav.appendChild(btn);
+  });
+  app.appendChild(bnav);
+  root.appendChild(app);
   if(UI.modal)renderModal(root);
 }
 
