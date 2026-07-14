@@ -226,9 +226,13 @@ function saveSession(){localStorage.setItem('apos_dash',JSON.stringify(SESSION))
 function loadSession(){try{const s=JSON.parse(localStorage.getItem('apos_dash')||'{}');if(s.token){SESSION=s;return true;}}catch(e){}return false;}
 
 async function loadData(){
-  if(!SESSION.token||!SESSION.bizId)return;
+  if(!SESSION.token||!SESSION.bizId){
+    console.warn('[ArroyoDash] loadData skipped - token:',!!SESSION.token,'bizId:',SESSION.bizId);
+    return;
+  }
   UI.loading=true;render();
   const bid=SESSION.bizId;
+  console.log('[ArroyoDash] loadData started for bizId:',bid);
   const results=await Promise.all([
     api('/rest/v1/sales?biz_id=eq.'+bid+'&order=date.desc&limit=1000'),
     api('/rest/v1/expenses?biz_id=eq.'+bid+'&order=date.desc&limit=500'),
@@ -248,6 +252,7 @@ async function loadData(){
   ]);
   const keys=['sales','expenses','products','employees','attendance','customers','credit','suppliers','pos','ingredients','recipes','wastage','orders','loans','leaves'];
   keys.forEach(function(k,i){D[k]=Array.isArray(results[i])?results[i]:[];});
+  console.log('[ArroyoDash] Data loaded - sales:',D.sales.length,'expenses:',D.expenses.length,'products:',D.products.length);
   UI.loading=false;render();
 }
 
@@ -361,10 +366,11 @@ function renderAuth(root){
     // Try to find business by user_id first, then fall back to any business
     let biz=await api('/rest/v1/businesses?user_id=eq.'+res.user.id);
     if(!biz||!biz[0]){
-      // Fallback — get any business (for accounts that aren't the owner)
-      biz=await api('/rest/v1/businesses?order=created_at.asc&limit=1');
+      // Fallback — try getting all businesses visible to this user
+      biz=await api('/rest/v1/businesses?limit=5');
     }
     if(biz&&biz[0]){SESSION.bizId=biz[0].id;SESSION.bizName=biz[0].name;}
+    console.log('[ArroyoDash] Login complete. bizId:',SESSION.bizId,'bizName:',SESSION.bizName);
     saveSession();await loadData();
   };
   pi.onkeydown=function(e){if(e.key==='Enter')btn.click();};
@@ -424,7 +430,10 @@ function renderApp(root){
   navItem('customers','ti-heart','Customers');
   sb.appendChild(nav);
   const foot=el('div','sb-foot');
-  foot.innerHTML='<div class="user-email">'+SESSION.email+'</div>';
+  foot.innerHTML='<div class="user-email">'+SESSION.email+'</div><div style="font-size:10px;color:var(--t3);padding:2px 8px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="'+SESSION.bizId+'">biz: '+(SESSION.bizId?SESSION.bizId.slice(0,8)+'...':'⚠ none')+'</div>';
+  const syncBtn=el('button','so-btn','<i class="ti ti-refresh" style="font-size:14px;vertical-align:-2px;margin-right:4px"></i>Sync data');
+  syncBtn.onclick=async function(){syncBtn.textContent='Syncing...';await loadData();syncBtn.innerHTML='<i class="ti ti-refresh" style="font-size:14px;vertical-align:-2px;margin-right:4px"></i>Sync data';};
+  foot.appendChild(syncBtn);
   const soBtn=el('button','so-btn','<i class="ti ti-logout" style="font-size:14px;vertical-align:-2px;margin-right:4px"></i>Sign out');
   soBtn.onclick=signOut;foot.appendChild(soBtn);
   sb.appendChild(foot);app.appendChild(sb);
@@ -531,6 +540,12 @@ function renderOverview(main,fs,fe,rev,exp,net){
   if(rev===0){
     const tip=el('div','');
     tip.style.cssText='background:rgba(47,129,247,0.08);border:1px solid rgba(47,129,247,0.2);border-radius:8px;padding:14px;margin-top:10px;font-size:13px;color:var(--t2);line-height:1.8';
+    // Show sync diagnostic if user has a bizId (might be data issue)
+    const diagHtml=SESSION.bizId?'<div style="margin-top:10px;padding:10px;background:rgba(255,255,255,0.05);border-radius:6px;font-size:11px;color:var(--t3)">'+
+      '<strong style="color:var(--t2)">🔍 Diagnostic</strong><br>'+
+      'BizID: '+SESSION.bizId+'<br>'+
+      'If you have sales in the POS app, try clicking <strong>Sync data</strong> in the sidebar, or sign out and sign back in.'+
+      '</div>':'';
     tip.innerHTML='<strong style="color:var(--ac);font-size:14px">👋 Welcome! Here\'s how to get started:</strong><br>'+
       '<div style="margin-top:8px;display:flex;flex-direction:column;gap:6px">'+
       '<div>1️⃣ <strong>Add products</strong> in the POS app (tap Inventory → + Add)</div>'+
@@ -539,7 +554,7 @@ function renderOverview(main,fs,fe,rev,exp,net){
       '<div>4️⃣ <strong>Add ingredients</strong> in Ingredients tab</div>'+
       '<div>5️⃣ <strong>Set recipes</strong> in Recipes tab to track costs</div>'+
       '<div>6️⃣ <strong>Start selling</strong> — data appears here automatically!</div>'+
-      '</div>';
+      '</div>'+diagHtml;
     profBar.appendChild(tip);
   }
 
