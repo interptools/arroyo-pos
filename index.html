@@ -929,7 +929,7 @@ function renderCashierLogin(app){
     list.appendChild(btn);
   });
   w.appendChild(list);
-  const skip=document.createElement('div');skip.style.cssText='font-size:11px;color:var(--t3);text-align:center;margin-top:4px';skip.textContent='Manage cashiers in Admin';w.appendChild(skip);
+  const skip=document.createElement('div');skip.style.cssText='font-size:11px;color:var(--t3);text-align:center;margin-top:4px';skip.textContent='Cashiers with role "Cashier" in dashboard auto-appear here';w.appendChild(skip);
   app.appendChild(w);
 }
 
@@ -1339,7 +1339,6 @@ function renderAtt(scr){
 async function loadAttEmployees(){
   if(!CLOUD.token){toast('Not signed in to cloud');return;}
   if(!CLOUD.bizId){
-    // Try to get bizId again
     try{
       const h2={...H,'Authorization':'Bearer '+CLOUD.token};
       const bizRes=await fetch(SUPA_URL+'/rest/v1/businesses?user_id=eq.'+CLOUD.user,{headers:h2});
@@ -1361,6 +1360,22 @@ async function loadAttEmployees(){
       const latest=todayAtt.length>0?todayAtt[todayAtt.length-1]:null;
       return{id:e.id,name:e.name,role:e.role,clockedIn:!!latest,timeIn:latest?new Date(latest.time_in).toLocaleTimeString([],{hour:'2-digit',minute:'2-digit'}):''};
     });
+    // Auto-sync Cashier-role employees into the local cashiers list
+    const cashierEmps=emps.filter(function(e){return e.role&&e.role.toLowerCase()==='cashier';});
+    cashierEmps.forEach(function(e){
+      const alreadyExists=S.cashiers.some(function(c){return c.name===e.name;});
+      if(!alreadyExists){
+        S.cashiers.push({id:S.cashierNid++,name:e.name,supaId:e.id});
+        save();
+      }
+    });
+    // Also remove from cashiers list if removed from Supabase (was cashier but no longer active)
+    const allNames=emps.filter(function(e){return e.role&&e.role.toLowerCase()==='cashier';}).map(function(e){return e.name;});
+    S.cashiers=S.cashiers.filter(function(c){
+      // Keep manually added cashiers (no supaId) and active Supabase cashiers
+      return !c.supaId||allNames.includes(c.name);
+    });
+    save();
   }catch(e){toast('Error loading employees: '+e.message);}
 }
 
