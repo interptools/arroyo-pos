@@ -174,8 +174,16 @@ function fd(d){return new Date(d).toLocaleDateString('en-PH',{month:'short',day:
 function ft(d){return new Date(d).toLocaleTimeString([],{hour:'2-digit',minute:'2-digit'});}
 
 async function api(path,opts){
-  const h={'apikey':SB_KEY,'Authorization':'Bearer '+(SESSION.token||SB_KEY),'Content-Type':'application/json',...(opts&&opts.headers||{})};
-  try{const r=await fetch(SB_URL+path,{...opts,headers:h});if(!r.ok)return null;const t=await r.text();return t?JSON.parse(t):null;}catch(e){return null;}
+  const h={'apikey':SB_KEY,'Authorization':'Bearer '+SB_KEY,'Content-Type':'application/json',...(opts&&opts.headers||{})};
+  try{
+    const r=await fetch(SB_URL+path,{...opts,headers:h});
+    if(!r.ok){
+      const errText=await r.text();
+      console.error('API error',r.status,errText);
+      return null;
+    }
+    const t=await r.text();return t?JSON.parse(t):null;
+  }catch(e){console.error('API fetch error',e);return null;}
 }
 async function signIn(email,pw){
   try{const r=await fetch(SB_URL+'/auth/v1/token?grant_type=password',{method:'POST',headers:{'apikey':SB_KEY,'Content-Type':'application/json'},body:JSON.stringify({email,password:pw})});return await r.json();}
@@ -322,7 +330,12 @@ function renderAuth(root){
     const res=await signIn(email,pw);
     if(!res.access_token){document.getElementById('dErr').textContent=res.error&&res.error.message||'Sign in failed.';btn.disabled=false;btn.textContent='Sign in to dashboard';return;}
     SESSION.token=res.access_token;SESSION.user=res.user&&res.user.id;SESSION.email=email;
-    const biz=await api('/rest/v1/businesses?user_id=eq.'+res.user.id);
+    // Try to find business by user_id first, then fall back to any business
+    let biz=await api('/rest/v1/businesses?user_id=eq.'+res.user.id);
+    if(!biz||!biz[0]){
+      // Fallback — get any business (for accounts that aren't the owner)
+      biz=await api('/rest/v1/businesses?order=created_at.asc&limit=1');
+    }
     if(biz&&biz[0]){SESSION.bizId=biz[0].id;SESSION.bizName=biz[0].name;}
     saveSession();await loadData();
   };
@@ -1015,11 +1028,18 @@ function renderModal(root){
     mfField(box,'iStock','Current stock','number',it.stock,'0');
     mfField(box,'iThresh','Low stock alert at','number',it.low_threshold||5,'5');
     mfField(box,'iCost','Cost per unit (PHP)','number',it.cost_per_unit,'0');
-    modalBtns(box,close,function(){
+    modalBtns(box,close,async function(){
       const p={biz_id:SESSION.bizId,name:gv('iName'),unit:gv('iUnit')||'pcs',stock:parseFloat(gv('iStock'))||0,low_threshold:parseFloat(gv('iThresh'))||5,cost_per_unit:parseFloat(gv('iCost'))||0};
       if(!p.name){alert('Enter name');return;}
-      if(!p.biz_id){alert('Not connected to cloud. Please sign out and sign in again.');return;}
-      save('ingredients',p,it.id);
+      if(!p.biz_id){
+        // Try to fetch bizId again
+        const biz=await api('/rest/v1/businesses?order=created_at.asc&limit=1');
+        if(biz&&biz[0]){SESSION.bizId=biz[0].id;SESSION.bizName=biz[0].name;p.biz_id=biz[0].id;saveSession();}
+        else{alert('Cannot find business. BizId: '+SESSION.bizId+'\nPlease sign out and sign in again.');return;}
+      }
+      const result=await api('/rest/v1/ingredients',{method:'POST',headers:{'Prefer':'return=representation'},body:JSON.stringify(p)});
+      if(!result){alert('Save failed. Please try again.');}
+      UI.modal=null;await loadData();
     },isNew?'Add':'Save');
 
   } else if(m.type==='wastage'){
