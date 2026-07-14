@@ -1263,7 +1263,8 @@ function renderAtt(scr){
       const h2={...H,'Prefer':'return=representation'};
       const today=new Date().toISOString().slice(0,10);
       if(e.clockedIn){
-        // Clock out
+        // Clock out - find the open attendance record
+        const attRes=await fetch(SUPA_URL+'/rest/v1/attendance?biz_id=eq.'+CLOUD.bizId+'&employee_id=eq.'+e.id+'&date=eq.'+today+'&time_out=is.null&order=time_in.desc&limit=1',{headers:h2});
         const attData=await attRes.json();
         if(attData&&attData[0]){
           const timeIn=new Date(attData[0].time_in);const timeOut=new Date();
