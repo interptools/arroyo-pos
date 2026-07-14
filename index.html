@@ -1319,36 +1319,49 @@ function renderAtt(scr){
 
   // Refresh button to reload employees
   const refBtn=document.createElement('button');refBtn.className='abtn';refBtn.textContent='Refresh employees';
+  refBtn.style.cssText='width:100%;padding:14px;font-size:14px;font-weight:700;border-radius:12px;cursor:pointer';
   refBtn.onclick=async function(){
     refBtn.textContent='Loading...';refBtn.disabled=true;
-    await loadAttEmployees();render();
+    toast('Loading employees...');
+    try{
+      await loadAttEmployees();
+      if(S.cloudAttEmployees&&S.cloudAttEmployees.length>0){
+        toast('Found '+S.cloudAttEmployees.length+' employee(s)');
+      } else {
+        toast('No employees found in Supabase');
+      }
+    }catch(e){toast('Error: '+e.message);}
+    render();
   };
   scr.appendChild(refBtn);
 }
 
 async function loadAttEmployees(){
-  if(!CLOUD.token||!CLOUD.bizId)return;
+  if(!CLOUD.token){toast('Not signed in to cloud');return;}
+  if(!CLOUD.bizId){
+    // Try to get bizId again
+    try{
+      const h2={...H,'Authorization':'Bearer '+CLOUD.token};
+      const bizRes=await fetch(SUPA_URL+'/rest/v1/businesses?user_id=eq.'+CLOUD.user,{headers:h2});
+      const bizData=await bizRes.json();
+      if(bizData&&bizData[0]){CLOUD.bizId=bizData[0].id;save();}
+      else{toast('No business found for this account');return;}
+    }catch(e){toast('Could not find business');return;}
+  }
   try{
     const h2={...H,'Authorization':'Bearer '+CLOUD.token};
     const today=new Date().toISOString().slice(0,10);
-    // Load employees
     const empRes=await fetch(SUPA_URL+'/rest/v1/employees?biz_id=eq.'+CLOUD.bizId+'&active=eq.true&order=name',{headers:h2});
     const emps=await empRes.json();
-    if(!Array.isArray(emps))return;
-    // Load today's attendance
+    if(!Array.isArray(emps)||emps.length===0){S.cloudAttEmployees=[];return;}
     const attRes=await fetch(SUPA_URL+'/rest/v1/attendance?biz_id=eq.'+CLOUD.bizId+'&date=eq.'+today,{headers:h2});
     const att=await attRes.json();
-    // Merge — mark who is clocked in (has time_in but no time_out today)
     S.cloudAttEmployees=emps.map(function(e){
       const todayAtt=Array.isArray(att)?att.filter(function(a){return a.employee_id===e.id&&!a.time_out;}):[];
       const latest=todayAtt.length>0?todayAtt[todayAtt.length-1]:null;
-      return{
-        id:e.id,name:e.name,role:e.role,
-        clockedIn:!!latest,
-        timeIn:latest?new Date(latest.time_in).toLocaleTimeString([],{hour:'2-digit',minute:'2-digit'}):''
-      };
+      return{id:e.id,name:e.name,role:e.role,clockedIn:!!latest,timeIn:latest?new Date(latest.time_in).toLocaleTimeString([],{hour:'2-digit',minute:'2-digit'}):''};
     });
-  }catch(e){}
+  }catch(e){toast('Error loading employees: '+e.message);}
 }
 
 function renderInv(scr){
