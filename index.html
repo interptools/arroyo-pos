@@ -1352,7 +1352,10 @@ async function loadAttEmployees(){
     const today=new Date().toISOString().slice(0,10);
     const empRes=await fetch(SUPA_URL+'/rest/v1/employees?biz_id=eq.'+CLOUD.bizId+'&active=eq.true&order=name',{headers:h2});
     const emps=await empRes.json();
-    if(!Array.isArray(emps)||emps.length===0){S.cloudAttEmployees=[];return;}
+    if(!Array.isArray(emps)||emps.length===0){
+      toast('BizID: '+CLOUD.bizId+' — 0 employees');
+      S.cloudAttEmployees=[];return;
+    }
     const attRes=await fetch(SUPA_URL+'/rest/v1/attendance?biz_id=eq.'+CLOUD.bizId+'&date=eq.'+today,{headers:h2});
     const att=await attRes.json();
     S.cloudAttEmployees=emps.map(function(e){
