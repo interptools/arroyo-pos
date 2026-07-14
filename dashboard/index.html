@@ -677,8 +677,15 @@ function renderCustomers(main){
   const hd=el('div','card-hd','Customer list');hd.appendChild(addBtn('+ Add customer',function(){UI.modal={type:'customer',item:null};render();}));c.appendChild(hd);
   D.customers.forEach(function(cust){
     const r=el('div','row');
-    r.innerHTML='<div class="row-l"><div class="row-name">'+cust.name+'</div><div class="row-sub">'+(cust.phone||'No phone')+'</div></div><div class="row-r">'+(cust.credit_balance>0?'<span class="badge b-red">Owes '+fmt(cust.credit_balance)+'</span>':'')+(cust.points>0?'<span class="badge b-blue">'+cust.points+' pts</span>':'')+'<button class="sm-btn" onclick="UI.modal={type:\'credit\',item:D.customers.find(function(x){return x.id===\''+cust.id+'\'})};render()">Utang</button><button class="sm-btn" onclick="UI.modal={type:\'customer\',item:D.customers.find(function(x){return x.id===\''+cust.id+'\'})};render()">Edit</button></div>';
-    c.appendChild(r);
+    const rl=el('div','row-l');
+    rl.innerHTML='<div class="row-name">'+cust.name+'</div><div class="row-sub">'+(cust.phone||'No phone')+'</div>';
+    const rr=el('div','row-r');
+    if(cust.credit_balance>0)rr.appendChild(el('span','badge b-red','Owes '+fmt(cust.credit_balance)));
+    if(cust.points>0)rr.appendChild(el('span','badge b-blue',cust.points+' pts'));
+    const utBtn=el('button','sm-btn','Utang');utBtn.onclick=function(){UI.modal={type:'credit',item:cust};render();};
+    const edBtn=el('button','sm-btn','Edit');edBtn.onclick=function(){UI.modal={type:'customer',item:cust};render();};
+    rr.appendChild(utBtn);rr.appendChild(edBtn);
+    r.appendChild(rl);r.appendChild(rr);c.appendChild(r);
   });
   if(!D.customers.length)c.appendChild(el('div','empty','No customers yet'));
   main.appendChild(c);
@@ -707,8 +714,12 @@ function renderSuppliers(main){
   const sc=el('div','card');
   const shd=el('div','card-hd','Suppliers');shd.appendChild(addBtn('+ Add',function(){UI.modal={type:'supplier',item:null};render();}));sc.appendChild(shd);
   D.suppliers.forEach(function(s){
-    const r=el('div','row');r.innerHTML='<div class="row-l"><div class="row-name">'+s.name+'</div><div class="row-sub">'+(s.phone||s.contact||'No contact')+'</div></div><div class="row-r">'+(s.balance_owed>0?'<span class="badge b-red">Owes '+fmt(s.balance_owed)+'</span>':'')+'<button class="sm-btn" onclick="UI.modal={type:\'supplier\',item:D.suppliers.find(function(x){return x.id===\''+s.id+'\'})};render()">Edit</button></div>';
-    sc.appendChild(r);
+    const r=el('div','row');
+    const rl=el('div','row-l');rl.innerHTML='<div class="row-name">'+s.name+'</div><div class="row-sub">'+(s.phone||s.contact||'No contact')+'</div>';
+    const rr=el('div','row-r');
+    if(s.balance_owed>0)rr.appendChild(el('span','badge b-red','Owes '+fmt(s.balance_owed)));
+    const edBtn=el('button','sm-btn','Edit');edBtn.onclick=function(){UI.modal={type:'supplier',item:s};render();};
+    rr.appendChild(edBtn);r.appendChild(rl);r.appendChild(rr);sc.appendChild(r);
   });
   if(!D.suppliers.length)sc.appendChild(el('div','empty','No suppliers yet'));
   two.appendChild(sc);
@@ -752,8 +763,15 @@ function renderRecipes(main){
       prodRecipes.forEach(function(r){
         const ing=D.ingredients.find(function(i){return i.id===r.ingredient_id;});
         const row=el('div','row');
-        row.innerHTML='<div class="row-l"><div class="row-name">'+r.ingredient_name+'</div><div class="row-sub">'+(ing?'Current stock: '+ing.stock+' '+ing.unit:'Ingredient not found')+'</div></div><div class="row-r"><span style="font-size:14px;font-weight:700;color:var(--ac)">'+r.qty_used+' '+(ing?ing.unit:'units')+' per sale</span><button class="sm-btn" onclick="UI.modal={type:\'recipe\',product:D.products.find(function(x){return x.id===\''+p.id+'\'}),item:D.recipes.find(function(x){return x.id===\''+r.id+'\'})};render()">Edit</button><button class="sm-btn" style="color:var(--dt)" onclick="api(\'/rest/v1/recipes?id=eq.'+r.id+'\',{method:\'DELETE\'}).then(loadData)">Remove</button></div>';
-        card.appendChild(row);
+        const rl=el('div','row-l');rl.innerHTML='<div class="row-name">'+r.ingredient_name+'</div><div class="row-sub">'+(ing?'Current stock: '+ing.stock+' '+ing.unit:'Ingredient not found')+'</div>';
+        const rr=el('div','row-r');
+        const qty=el('span','');qty.style.cssText='font-size:13px;font-weight:700;color:var(--ac)';qty.textContent=r.qty_used+' '+(ing?ing.unit:'units')+' per sale';
+        const edBtn=el('button','sm-btn','Edit');
+        edBtn.onclick=function(){UI.modal={type:'recipe',product:p,item:r};render();};
+        const rmBtn=el('button','sm-btn','Remove');rmBtn.style.color='var(--dt)';
+        rmBtn.onclick=function(){if(confirm('Remove this ingredient?'))api('/rest/v1/recipes?id=eq.'+r.id,{method:'DELETE'}).then(loadData);};
+        rr.appendChild(qty);rr.appendChild(edBtn);rr.appendChild(rmBtn);
+        row.appendChild(rl);row.appendChild(rr);card.appendChild(row);
       });
     }
     main.appendChild(card);
@@ -773,7 +791,15 @@ function renderIngredients(main){
   const hd=el('div','card-hd','Ingredient stock');hd.appendChild(addBtn('+ Add ingredient',function(){UI.modal={type:'ingredient',item:null};render();}));c.appendChild(hd);
   D.ingredients.sort(function(a,b){return a.stock-b.stock;}).forEach(function(ing){
     const isLow=ing.stock<=ing.low_threshold;
-    const r=el('div','row');r.innerHTML='<div class="row-l"><div class="row-name">'+ing.name+'</div><div class="row-sub">'+ing.unit+' · Cost: '+fmt(ing.cost_per_unit)+'/unit</div></div><div class="row-r"><span class="badge '+(isLow?'b-amber':'b-green')+'">'+ing.stock+' '+(isLow?'⚠ low':'OK')+'</span><button class="sm-btn" onclick="UI.modal={type:\'ingredient\',item:D.ingredients.find(function(x){return x.id===\''+ing.id+'\'})};render()">Edit</button></div>';
+    const r=el('div','row');
+    const rl=el('div','row-l');
+    rl.innerHTML='<div class="row-name">'+ing.name+'</div><div class="row-sub">'+ing.unit+' · Cost: '+fmt(ing.cost_per_unit)+'/unit</div>';
+    const rr=el('div','row-r');
+    const badge=el('span','badge '+(isLow?'b-amber':'b-green'),ing.stock+' '+(isLow?'⚠ low':'OK'));
+    const editBtn=el('button','sm-btn','Edit');
+    editBtn.onclick=function(){UI.modal={type:'ingredient',item:ing};render();};
+    rr.appendChild(badge);rr.appendChild(editBtn);
+    r.appendChild(rl);r.appendChild(rr);
     c.appendChild(r);
   });
   if(!D.ingredients.length)c.appendChild(el('div','empty','No ingredients yet'));
@@ -793,8 +819,13 @@ function renderOrders(main){
   const hd=el('div','card-hd','All orders');hd.appendChild(addBtn('+ New order',function(){UI.modal={type:'order',item:null};render();}));c.appendChild(hd);
   const scls={pending:'b-amber',confirmed:'b-blue',ready:'b-green',delivered:'b-gray',cancelled:'b-red'};
   D.orders.forEach(function(o){
-    const r=el('div','row');r.innerHTML='<div class="row-l"><div class="row-name">'+o.order_no+' — '+o.customer_name+'</div><div class="row-sub">'+(o.customer_phone||'')+' · '+(o.delivery_date?fd(o.delivery_date):'No date')+'</div></div><div class="row-r"><span class="badge '+(scls[o.status]||'b-gray')+'">'+o.status.toUpperCase()+'</span><span style="font-weight:700;color:var(--ac)">'+fmt(o.total)+'</span><button class="sm-btn" onclick="UI.modal={type:\'order\',item:D.orders.find(function(x){return x.id===\''+o.id+'\'})};render()">Edit</button></div>';
-    c.appendChild(r);
+    const r=el('div','row');
+    const rl=el('div','row-l');rl.innerHTML='<div class="row-name">'+o.order_no+' — '+o.customer_name+'</div><div class="row-sub">'+(o.customer_phone||'')+' · '+(o.delivery_date?fd(o.delivery_date):'No date')+'</div>';
+    const rr=el('div','row-r');
+    rr.appendChild(el('span','badge '+(scls[o.status]||'b-gray'),o.status.toUpperCase()));
+    const amt=el('span','','');amt.style.cssText='font-weight:700;color:var(--ac)';amt.textContent=fmt(o.total);
+    const edBtn=el('button','sm-btn','Edit');edBtn.onclick=function(){UI.modal={type:'order',item:o};render();};
+    rr.appendChild(amt);rr.appendChild(edBtn);r.appendChild(rl);r.appendChild(rr);c.appendChild(r);
   });
   if(!D.orders.length)c.appendChild(el('div','empty','No orders yet'));
   main.appendChild(c);
