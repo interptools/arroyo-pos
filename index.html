@@ -391,7 +391,10 @@ input,select,textarea{user-select:text;-webkit-user-select:text}
 <script>
 const CUR='PHP ',TAX=0.12;
 const CREATOR_PASS='ReeseK28@@@';
-const CR={name:'Reymar Arroyo',phone:'+639063964052',email:'areymar36@gmail.com',app:'Arroyo POS',ver:'3.0'};
+const CR={name:'Reymar Arroyo',phone:'+639063964052',email:'areymar36@gmail.com',app:'Arroyo POS',ver:'3.1'};
+const GITHUB_PAGES_URL='https://interptools.github.io/arroyo-pos';
+const VERSION_URL=GITHUB_PAGES_URL+'/version.json';
+const UPDATE_URL=GITHUB_PAGES_URL+'/index.html';
 
 const SUPA_URL='https://btfazallxcbmiitbcmkv.supabase.co';
 const SUPA_KEY='eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImJ0ZmF6YWxseGNibWlpdGJjbWt2Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODM5NjkwODIsImV4cCI6MjA5OTU0NTA4Mn0.Iu0qjlPttxxqY_LcvTND9Uir3uy71FCv469NjlfiIBE';
@@ -629,6 +632,47 @@ let S={
   cloudCustomers:[],
   cloudAttEmployees:[],
 };
+
+async function checkForUpdate(){
+  try{
+    const r=await fetch(VERSION_URL+'?t='+Date.now());
+    if(!r.ok)return{status:'error',msg:'Could not reach update server.'};
+    const data=await r.json();
+    const latest=data.version||'0';
+    const current=CR.ver;
+    if(latest===current)return{status:'latest',version:latest};
+    // Compare versions
+    const parts=function(v){return v.split('.').map(Number);};
+    const lp=parts(latest),cp=parts(current);
+    let newer=false;
+    for(let i=0;i<Math.max(lp.length,cp.length);i++){
+      const l=lp[i]||0,c=cp[i]||0;
+      if(l>c){newer=true;break;}
+      if(l<c){break;}
+    }
+    if(newer)return{status:'available',version:latest,notes:data.notes||''};
+    return{status:'latest',version:latest};
+  }catch(e){return{status:'error',msg:'Network error. Check your connection.'};}
+}
+
+async function applyUpdate(){
+  try{
+    toast('Downloading update...');
+    const r=await fetch(UPDATE_URL+'?t='+Date.now());
+    if(!r.ok){toast('Download failed. Try again.');return false;}
+    const html=await r.text();
+    // Save new version to localStorage so it loads next time
+    localStorage.setItem('arroyo_pos_update',html);
+    toast('Update downloaded! Reloading...');
+    setTimeout(function(){
+      // Write new content and reload
+      const blob=new Blob([html],{type:'text/html'});
+      const url=URL.createObjectURL(blob);
+      window.location.href=url;
+    },1200);
+    return true;
+  }catch(e){toast('Update failed: '+e.message);return false;}
+}
 
 function load(){
   try{
