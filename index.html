@@ -1595,7 +1595,7 @@ async function loadAttEmployees(){
     // Use anon key headers for reading employees (public business data)
     const h2={...H};
     const today=new Date().toISOString().slice(0,10);
-    const empRes=await fetch(SUPA_URL+'/rest/v1/employees?biz_id=eq.'+CLOUD.bizId+'&order=name',{headers:h2});
+    const empRes=await fetch(SUPA_URL+'/rest/v1/employees?biz_id=eq.'+CLOUD.bizId+'&active=eq.true&order=name',{headers:h2});
     const emps=await empRes.json();
     if(!Array.isArray(emps)||emps.length===0){
       toast('BizID: '+CLOUD.bizId+' — 0 employees');
@@ -1623,6 +1623,10 @@ async function loadAttEmployees(){
       // Keep manually added cashiers (no supaId) and active Supabase cashiers
       return !c.supaId||allNames.includes(c.name);
     });
+    // If the active cashier was deactivated in Supabase, end their shift now
+    if(S.activeCashier&&S.activeCashier.supaId&&!allNames.includes(S.activeCashier.name)){
+      S.activeCashier=null;S.shiftStart=null;
+    }
     save();
   }catch(e){toast('Error loading employees: '+e.message);}
 }
@@ -2301,7 +2305,12 @@ function renderModal(app){
           const tx=S.sales.find(s=>s.id===m.tx.id);
           if(tx){tx.voided=true;S.salesTotal=Math.max(0,S.salesTotal-tx.total);
             tx.items.forEach(it=>{const p=S.prods.find(x=>x.name===it.name);if(p&&p.stock!==999)p.stock+=it.qty;});}
-          save();closeModal();toast('Transaction voided');
+          save();
+          // Sync void to cloud so dashboard reflects it
+          if(CLOUD.token&&CLOUD.bizId){
+            fetch(SUPA_URL+'/rest/v1/sales?txn_id=eq.'+m.tx.id+'&biz_id=eq.'+CLOUD.bizId,{method:'PATCH',headers:{...cloudHeaders(),'Prefer':'return=representation'},body:JSON.stringify({voided:true})}).catch(function(){});
+          }
+          closeModal();toast('Transaction voided');
         }
       };
       b.appendChild(vb);
