@@ -2054,10 +2054,90 @@ function renderAdmin(scr){
 
 function renderAbout(scr){
   const body=document.createElement('div');body.className='about-body';
-  body.innerHTML='<div class="about-card"><div style="font-size:28px;font-weight:800;letter-spacing:-1px">'+CR.app+'</div><div style="font-size:14px;color:var(--t2)">Universal Point of Sale</div><div style="font-size:12px;color:var(--t3);padding:4px 14px;border-radius:20px;background:var(--bg3);border:1px solid var(--b1)">Version '+CR.ver+'</div>'
-    +'<div style="font-size:13px;color:var(--t2);text-align:left;width:100%;line-height:2;border-top:1px solid var(--b1);padding-top:12px;margin-top:4px"><strong style="display:block;margin-bottom:6px;color:var(--t1)">v2.0 — What\'s new</strong>'
-    +'✓ Business logo upload<br>✓ Item photos in inventory<br>✓ Product variants (size/color)<br>✓ Customer notes per cart item<br>✓ Void / refund transactions<br>✓ Low stock alert banner<br>✓ Export sales to CSV<br>✓ Daily sales goal &amp; progress bar<br>✓ Multi-cashier &amp; shift tracking<br>✓ Expense tracker with net profit</div></div>'
-    +'<div class="about-card"><div class="av">RA</div><div style="font-size:18px;font-weight:700">'+CR.name+'</div><div style="font-size:13px;color:var(--t2)">Creator &amp; Developer</div><div class="divl"></div><div class="cr"><div class="cico">PH</div><span>'+CR.phone+'</span></div><div class="cr"><div class="cico">@</div><span>'+CR.email+'</span></div><div class="divl"></div><p style="font-size:13px;color:var(--t3);line-height:1.7">For customization or support, contact via phone or email.</p></div>';
+
+  // ── App card ──
+  const appCard=document.createElement('div');appCard.className='about-card';
+  appCard.innerHTML='<div style="font-size:28px;font-weight:800;letter-spacing:-1px">'+CR.app+'</div>'
+    +'<div style="font-size:14px;color:var(--t2)">Universal Point of Sale</div>'
+    +'<div style="font-size:12px;color:var(--t3);padding:4px 14px;border-radius:20px;background:var(--bg3);border:1px solid var(--b1)">Version '+CR.ver+'</div>'
+    +'<div style="font-size:13px;color:var(--t2);text-align:left;width:100%;line-height:2;border-top:1px solid var(--b1);padding-top:12px;margin-top:4px">'
+    +'<strong style="display:block;margin-bottom:6px;color:var(--t1)">v3.1 — What\'s new</strong>'
+    +'✓ Items sold breakdown in History<br>✓ Auto-sync on every app open<br>✓ Same account = same data on all devices<br>✓ Settings sync across devices<br>✓ Product delete syncs to cloud<br>✓ Ingredients &amp; recipes save fixed<br>✓ In-app updater</div>';
+  body.appendChild(appCard);
+
+  // ── Update card ──
+  const updCard=document.createElement('div');updCard.className='about-card';
+  updCard.style.cssText='gap:10px';
+
+  const updTitle=document.createElement('div');updTitle.style.cssText='font-size:16px;font-weight:700;width:100%';updTitle.textContent='App update';
+  updCard.appendChild(updTitle);
+
+  const verRow=document.createElement('div');verRow.style.cssText='display:flex;justify-content:space-between;width:100%;font-size:13px;color:var(--t2)';
+  verRow.innerHTML='<span>Current version</span><span style="font-weight:700;color:var(--t1)">v'+CR.ver+'</span>';
+  updCard.appendChild(verRow);
+
+  const latestRow=document.createElement('div');latestRow.style.cssText='display:flex;justify-content:space-between;width:100%;font-size:13px;color:var(--t2)';
+  latestRow.innerHTML='<span>Latest version</span><span id="latestVerTxt" style="font-weight:700;color:var(--t3)">—</span>';
+  updCard.appendChild(latestRow);
+
+  const statusBox=document.createElement('div');statusBox.id='updateStatusBox';
+  statusBox.style.cssText='width:100%;font-size:13px;padding:10px 14px;border-radius:10px;background:var(--bg3);color:var(--t2);text-align:center;display:none;line-height:1.6';
+  updCard.appendChild(statusBox);
+
+  const notesBox=document.createElement('div');notesBox.id='updateNotesBox';
+  notesBox.style.cssText='width:100%;font-size:12px;color:var(--t2);background:var(--bg3);border-radius:10px;padding:10px 14px;display:none;line-height:1.8;text-align:left';
+  updCard.appendChild(notesBox);
+
+  const btnRow=document.createElement('div');btnRow.style.cssText='display:flex;gap:8px;width:100%';
+
+  const checkBtn=document.createElement('button');checkBtn.className='abtn';checkBtn.style.cssText='flex:1;padding:12px;font-size:14px;font-weight:700';checkBtn.textContent='Check for update';
+  const applyBtn=document.createElement('button');applyBtn.className='abtn pri';applyBtn.style.cssText='flex:1;padding:12px;font-size:14px;font-weight:700;display:none';applyBtn.textContent='Update now';
+
+  checkBtn.onclick=async function(){
+    checkBtn.textContent='Checking...';checkBtn.disabled=true;
+    statusBox.style.display='block';statusBox.style.background='var(--bg3)';statusBox.style.color='var(--t2)';statusBox.textContent='Checking for updates...';
+    notesBox.style.display='none';applyBtn.style.display='none';
+    const result=await checkForUpdate();
+    checkBtn.textContent='Check for update';checkBtn.disabled=false;
+    const ltxt=document.getElementById('latestVerTxt');
+    if(result.status==='latest'){
+      if(ltxt)ltxt.textContent='v'+result.version;
+      statusBox.style.background='var(--sg)';statusBox.style.color='var(--st)';statusBox.textContent='✓ You are on the latest version.';
+      applyBtn.style.display='none';
+    } else if(result.status==='available'){
+      if(ltxt)ltxt.textContent='v'+result.version;
+      statusBox.style.background='var(--ac2)';statusBox.style.color='var(--ac)';statusBox.textContent='🆕 Update available — v'+result.version;
+      if(result.notes){notesBox.style.display='block';notesBox.innerHTML='<strong style="color:var(--t1)">What\'s new:</strong><br>'+result.notes.replace(/\n/g,'<br>');}
+      applyBtn.style.display='block';
+    } else {
+      statusBox.style.background='var(--dg)';statusBox.style.color='var(--dt)';statusBox.textContent='⚠ '+result.msg;
+    }
+  };
+
+  applyBtn.onclick=async function(){
+    applyBtn.textContent='Updating...';applyBtn.disabled=true;checkBtn.disabled=true;
+    statusBox.textContent='Downloading update, please wait...';
+    await applyUpdate();
+  };
+
+  btnRow.appendChild(checkBtn);btnRow.appendChild(applyBtn);updCard.appendChild(btnRow);
+
+  const hintTxt=document.createElement('div');hintTxt.style.cssText='font-size:11px;color:var(--t3);text-align:center;line-height:1.6';
+  hintTxt.textContent='Updates are applied instantly. Your data is never lost.';
+  updCard.appendChild(hintTxt);
+  body.appendChild(updCard);
+
+  // ── Creator card ──
+  const creatorCard=document.createElement('div');creatorCard.className='about-card';
+  creatorCard.innerHTML='<div class="av">RA</div><div style="font-size:18px;font-weight:700">'+CR.name+'</div>'
+    +'<div style="font-size:13px;color:var(--t2)">Creator &amp; Developer</div>'
+    +'<div class="divl"></div>'
+    +'<div class="cr"><div class="cico">PH</div><span>'+CR.phone+'</span></div>'
+    +'<div class="cr"><div class="cico">@</div><span>'+CR.email+'</span></div>'
+    +'<div class="divl"></div>'
+    +'<p style="font-size:13px;color:var(--t3);line-height:1.7">For customization or support, contact via phone or email.</p>';
+  body.appendChild(creatorCard);
+
   scr.appendChild(body);
 }
 
