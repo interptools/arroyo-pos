@@ -514,9 +514,9 @@ async function deductIngredients(cartItems){
     }
   }catch(e){}
 }
-async function loadCloudData(){
+async function loadCloudData(silent){
   if(!CLOUD.token||!CLOUD.bizId)return;
-  toast('Syncing from cloud...');
+  if(!silent)toast('Syncing from cloud...');
   try{
     const ch=cloudHeaders();
     const [sales,expenses,prods]=await Promise.all([
@@ -533,8 +533,9 @@ async function loadCloudData(){
       S.prods=prods.map(p=>({id:p.local_id||p.id,name:p.name,price:p.price,cat:p.cat,icon:p.icon||'ITEM',stock:p.stock,variants:p.variants||[],img:p.img||null,salePct:p.sale_pct||0}));
       const cs=[...new Set(S.prods.map(p=>p.cat))];S.cats=['All',...cs];
     }
-    save();toast('Cloud sync complete');
-  }catch(e){toast('Sync error — using local data');}
+    save();if(!silent)toast('Cloud sync complete');
+  }catch(e){if(!silent)toast('Sync error — using local data');}
+  await loadSettingsFromCloud();
   await loadCloudCustomers();
   await loadAttEmployees();
 }
@@ -547,6 +548,46 @@ async function saveProductsToCloud(){
       const rows=S.prods.map(p=>({biz_id:CLOUD.bizId,local_id:p.id,name:p.name,price:p.price,cat:p.cat,icon:p.icon,stock:p.stock,variants:p.variants||[],img:p.img||null,sale_pct:p.salePct||0}));
       await fetch(SUPA_URL+'/rest/v1/products',{method:'POST',headers:ch,body:JSON.stringify(rows)});
     }
+  }catch(e){}
+}
+async function saveSettingsToCloud(){
+  if(!CLOUD.token||!CLOUD.bizId)return;
+  try{
+    const ch=cloudHeaders();
+    const settings={
+      biz_name:S.bizName,
+      pass:S.pass,
+      daily_goal:S.dailyGoal||0,
+      require_ref:S.requireRef||false,
+      theme_color:S.themeColor||'#111110',
+      biz_logo:S.bizLogo||null,
+      cashiers:S.cashiers||[],
+      cashier_nid:S.cashierNid||1,
+    };
+    await fetch(SUPA_URL+'/rest/v1/businesses?id=eq.'+CLOUD.bizId,{
+      method:'PATCH',
+      headers:{...ch,'Prefer':'return=representation'},
+      body:JSON.stringify({name:S.bizName,settings:JSON.stringify(settings)})
+    });
+  }catch(e){}
+}
+async function loadSettingsFromCloud(){
+  if(!CLOUD.token||!CLOUD.bizId)return;
+  try{
+    const ch=cloudHeaders();
+    const r=await fetch(SUPA_URL+'/rest/v1/businesses?id=eq.'+CLOUD.bizId,{headers:ch});
+    const data=await r.json();
+    if(!data||!data[0]||!data[0].settings)return;
+    const settings=typeof data[0].settings==='string'?JSON.parse(data[0].settings):data[0].settings;
+    if(settings.biz_name)S.bizName=settings.biz_name;
+    if(settings.pass)S.pass=settings.pass;
+    if(settings.daily_goal!==undefined)S.dailyGoal=settings.daily_goal;
+    if(settings.require_ref!==undefined)S.requireRef=settings.require_ref;
+    if(settings.theme_color){S.themeColor=settings.theme_color;applyTheme(settings.theme_color);}
+    if(settings.biz_logo!==undefined)S.bizLogo=settings.biz_logo;
+    if(settings.cashiers&&settings.cashiers.length>0)S.cashiers=settings.cashiers;
+    if(settings.cashier_nid)S.cashierNid=settings.cashier_nid;
+    save();
   }catch(e){}
 }
 const BT=[
@@ -1722,7 +1763,7 @@ function renderLock(scr){
   const resetThemeBtn=document.createElement('button');
   resetThemeBtn.style.cssText='width:100%;padding:10px;border-radius:10px;border:1px solid rgba(255,255,255,0.15);background:transparent;color:#666660;font-size:12px;cursor:pointer;margin-top:-4px';
   resetThemeBtn.textContent='Reset to dark theme';
-  resetThemeBtn.onclick=function(){S.themeColor='#111110';applyTheme('#111110');save();toast('Theme reset to dark');};
+  resetThemeBtn.onclick=function(){S.themeColor='#111110';applyTheme('#111110');save();saveSettingsToCloud();toast('Theme reset to dark');};
   card.appendChild(inp);card.appendChild(err);card.appendChild(btn);card.appendChild(resetThemeBtn);
   w.appendChild(card);scr.appendChild(w);
 }
@@ -1765,14 +1806,14 @@ function renderAdmin(scr){
     const prev=document.createElement('img');prev.src=S.bizLogo;prev.className='logo-preview';logoArea.appendChild(prev);
     const lh=document.createElement('div');lh.className='logo-hint';lh.textContent='Tap to change logo';logoArea.appendChild(lh);
     const remL=document.createElement('button');remL.className='abtn';remL.textContent='Remove logo';remL.style.cssText='margin-top:2px;font-size:12px;padding:7px 12px';
-    remL.onclick=function(e){e.stopPropagation();S.bizLogo=null;save();render();toast('Logo removed');};
+    remL.onclick=function(e){e.stopPropagation();S.bizLogo=null;save();saveSettingsToCloud();render();toast('Logo removed');};
     secLogo.appendChild(logoArea);secLogo.appendChild(remL);
   } else {
     logoArea.innerHTML='<div style="font-size:28px;color:var(--t3)">📷</div><div class="logo-hint">Tap to upload your business logo<br>Square PNG or JPG recommended</div>';
     secLogo.appendChild(logoArea);
   }
   const logoFileInp=document.createElement('input');logoFileInp.type='file';logoFileInp.accept='image/*';logoFileInp.style.display='none';
-  logoFileInp.onchange=function(){const file=this.files[0];if(!file)return;const reader=new FileReader();reader.onload=function(ev){S.bizLogo=ev.target.result;save();render();toast('Logo uploaded!');};reader.readAsDataURL(file);};
+  logoFileInp.onchange=function(){const file=this.files[0];if(!file)return;const reader=new FileReader();reader.onload=function(ev){S.bizLogo=ev.target.result;save();saveSettingsToCloud();render();toast('Logo uploaded!');};reader.readAsDataURL(file);};
   logoArea.onclick=function(){logoFileInp.click();};secLogo.appendChild(logoFileInp);scroll.appendChild(secLogo);
 
   // ── Cashiers ──
@@ -1782,13 +1823,13 @@ function renderAdmin(scr){
     const cr=document.createElement('div');cr.style.cssText='display:flex;align-items:center;gap:10px;padding:8px 0;border-bottom:1px solid var(--b1)';
     cr.innerHTML='<div style="flex:1;font-size:14px;font-weight:600">'+c.name+'</div>';
     const del=document.createElement('button');del.className='abtn';del.style.cssText='padding:6px 12px;font-size:12px;color:var(--dt)';del.textContent='Remove';
-    del.onclick=function(){if(confirm('Remove '+c.name+'?')){S.cashiers=S.cashiers.filter(x=>x.id!==c.id);if(S.activeCashier&&S.activeCashier.id===c.id){S.activeCashier=null;S.shiftStart=null;}save();render();}};
+    del.onclick=function(){if(confirm('Remove '+c.name+'?')){S.cashiers=S.cashiers.filter(x=>x.id!==c.id);if(S.activeCashier&&S.activeCashier.id===c.id){S.activeCashier=null;S.shiftStart=null;}save();saveSettingsToCloud();render();}};
     cr.appendChild(del);secCash.appendChild(cr);
   });
   const addCRow=document.createElement('div');addCRow.style.cssText='display:flex;gap:8px';
   const cNameInp=document.createElement('input');cNameInp.placeholder='Cashier name';cNameInp.style.cssText='flex:1;padding:10px 12px;border-radius:10px;border:1.5px solid var(--b2);background:var(--bg1);color:var(--t1);font-size:14px;outline:none';
   const addCBtn=document.createElement('button');addCBtn.className='abtn pri';addCBtn.textContent='Add';addCBtn.style.cssText='flex-shrink:0;padding:10px 14px';
-  addCBtn.onclick=function(){const nm=cNameInp.value.trim();if(!nm){toast('Enter a name');return;}S.cashiers.push({id:S.cashierNid++,name:nm});save();render();toast(nm+' added');};
+  addCBtn.onclick=function(){const nm=cNameInp.value.trim();if(!nm){toast('Enter a name');return;}S.cashiers.push({id:S.cashierNid++,name:nm});save();saveSettingsToCloud();render();toast(nm+' added');};
   addCRow.appendChild(cNameInp);addCRow.appendChild(addCBtn);secCash.appendChild(addCRow);
   scroll.appendChild(secCash);
 
@@ -1800,7 +1841,7 @@ function renderAdmin(scr){
   goalRow.appendChild(goalInp);sec1.appendChild(goalRow);
   const s1btn=document.createElement('div');s1btn.className='abtnrow';
   const saveShopBtn=document.createElement('button');saveShopBtn.className='abtn pri';saveShopBtn.textContent='Save';
-  saveShopBtn.onclick=function(){S.bizName=document.getElementById('aName').value||S.bizName;S.dailyGoal=parseFloat(goalInp.value)||0;save();render();toast('Saved!');};
+  saveShopBtn.onclick=function(){S.bizName=document.getElementById('aName').value||S.bizName;S.dailyGoal=parseFloat(goalInp.value)||0;save();saveSettingsToCloud();render();toast('Saved!');};
     // Reference number toggle
   const refToggleRow=document.createElement('div');
   refToggleRow.style.cssText='display:flex;align-items:center;justify-content:space-between;gap:12px;padding:10px 0;border-top:1px solid var(--b1);margin-top:4px';
@@ -1810,7 +1851,7 @@ function renderAdmin(scr){
   const knb=document.createElement('div');
   knb.style.cssText='width:22px;height:22px;border-radius:50%;background:#fff;position:absolute;top:3px;transition:all 0.2s;'+(S.requireRef?'right:3px':'left:3px');
   tog.appendChild(knb);
-  tog.onclick=function(){S.requireRef=!S.requireRef;save();render();toast('Reference '+(S.requireRef?'required':'optional'));};
+  tog.onclick=function(){S.requireRef=!S.requireRef;save();saveSettingsToCloud();render();toast('Reference '+(S.requireRef?'required':'optional'));};
   refToggleRow.appendChild(tog);sec1.appendChild(refToggleRow);
 
   s1btn.appendChild(saveShopBtn);sec1.appendChild(s1btn);scroll.appendChild(sec1);
@@ -1834,7 +1875,7 @@ function renderAdmin(scr){
   };
   const saveColorBtn=document.createElement('button');
   saveColorBtn.className='abtn pri';saveColorBtn.textContent='Save';saveColorBtn.style.cssText='flex-shrink:0;padding:12px 16px';
-  saveColorBtn.onclick=function(){save();toast('Color saved!');};
+  saveColorBtn.onclick=function(){save();saveSettingsToCloud();toast('Color saved!');};
   colorRow.appendChild(colorPreview);colorRow.appendChild(hexInp);colorRow.appendChild(saveColorBtn);
   sec2.appendChild(colorRow);
 
@@ -1851,7 +1892,7 @@ function renderAdmin(scr){
     btn.onclick=function(){
       S.themeColor=p.c;
       hexInp.value=p.c;colorPreview.style.background=p.c;
-      applyTheme(p.c);save();toast(p.l+' applied!');
+      applyTheme(p.c);save();saveSettingsToCloud();toast(p.l+' applied!');
     };
     presetRow.appendChild(btn);
   });
@@ -1931,7 +1972,7 @@ function renderAdmin(scr){
     if(cur!==S.pass){pwMsg.style.color='var(--dt)';pwMsg.textContent='Wrong password.';return;}
     if(nw.length<4){pwMsg.style.color='var(--dt)';pwMsg.textContent='Min 4 characters.';return;}
     if(nw!==con){pwMsg.style.color='var(--dt)';pwMsg.textContent='Passwords do not match.';return;}
-    S.pass=nw;save();pwMsg.style.color='var(--st)';pwMsg.textContent='Password changed!';
+    S.pass=nw;save();saveSettingsToCloud();pwMsg.style.color='var(--st)';pwMsg.textContent='Password changed!';
     setTimeout(()=>{pwMsg.textContent='';},3000);
   };
   pwRow.appendChild(pwMsg);pwRow.appendChild(pwBtn);sec4.appendChild(pwRow);scroll.appendChild(sec4);
@@ -2547,6 +2588,13 @@ function renderModal(app){
 }
 
 load();render();
+// Auto-sync from cloud on every app open if signed in
+(async function(){
+  if(CLOUD.token&&CLOUD.bizId){
+    await loadCloudData(true);
+    render();
+  }
+})();
 if('serviceWorker' in navigator){window.addEventListener('load',()=>{navigator.serviceWorker.register('./sw.js').catch(()=>{});});}
 </script>
 </body>
