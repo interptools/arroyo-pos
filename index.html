@@ -544,18 +544,21 @@ async function loadCloudData(silent){
   await loadAttEmployees();
 }
 async function saveProductsToCloud(){
-  if(!CLOUD.token||!CLOUD.bizId)return;
+  if(!CLOUD.token||!CLOUD.bizId)return false;
   try{
     const ch=cloudHeaders();
-    await fetch(SUPA_URL+'/rest/v1/products?biz_id=eq.'+CLOUD.bizId,{method:'DELETE',headers:ch});
+    const delRes=await fetch(SUPA_URL+'/rest/v1/products?biz_id=eq.'+CLOUD.bizId,{method:'DELETE',headers:ch});
+    if(!delRes.ok){console.error('saveProductsToCloud DELETE failed:',delRes.status,await delRes.text());return false;}
     if(S.prods.length>0){
       const rows=S.prods.map(p=>({biz_id:CLOUD.bizId,local_id:p.id,name:p.name,price:p.price,cat:p.cat,icon:p.icon,stock:p.stock,variants:p.variants||[],img:p.img||null,sale_pct:p.salePct||0}));
-      await fetch(SUPA_URL+'/rest/v1/products',{method:'POST',headers:ch,body:JSON.stringify(rows)});
+      const postRes=await fetch(SUPA_URL+'/rest/v1/products',{method:'POST',headers:ch,body:JSON.stringify(rows)});
+      if(!postRes.ok){console.error('saveProductsToCloud POST failed:',postRes.status,await postRes.text());return false;}
     }
-  }catch(e){}
+    return true;
+  }catch(e){console.error('saveProductsToCloud error:',e);return false;}
 }
 async function saveSettingsToCloud(){
-  if(!CLOUD.token||!CLOUD.bizId)return;
+  if(!CLOUD.token||!CLOUD.bizId)return false;
   try{
     const ch=cloudHeaders();
     const settings={
@@ -568,12 +571,14 @@ async function saveSettingsToCloud(){
       cashiers:S.cashiers||[],
       cashier_nid:S.cashierNid||1,
     };
-    await fetch(SUPA_URL+'/rest/v1/businesses?id=eq.'+CLOUD.bizId,{
+    const r=await fetch(SUPA_URL+'/rest/v1/businesses?id=eq.'+CLOUD.bizId,{
       method:'PATCH',
       headers:{...ch,'Prefer':'return=representation'},
       body:JSON.stringify({name:S.bizName,settings:JSON.stringify(settings)})
     });
-  }catch(e){}
+    if(!r.ok){console.error('saveSettingsToCloud failed:',r.status,await r.text());return false;}
+    return true;
+  }catch(e){console.error('saveSettingsToCloud error:',e);return false;}
 }
 async function loadSettingsFromCloud(){
   if(!CLOUD.token||!CLOUD.bizId)return;
@@ -1070,8 +1075,9 @@ function renderWizard(app){
       // Sync biz to cloud if connected
       if(CLOUD.token&&CLOUD.user){
         try{
-          await fetch(SUPA_URL+'/rest/v1/businesses',{method:'POST',headers:{...H,'Prefer':'return=representation'},body:JSON.stringify({user_id:CLOUD.user,name:WIZ.bizName,biz_type:WIZ.bizType})});
-          const bizRes=await fetch(SUPA_URL+'/rest/v1/businesses?user_id=eq.'+CLOUD.user,{headers:H});
+          const ch=cloudHeaders();
+          await fetch(SUPA_URL+'/rest/v1/businesses',{method:'POST',headers:ch,body:JSON.stringify({user_id:CLOUD.user,name:WIZ.bizName,biz_type:WIZ.bizType})});
+          const bizRes=await fetch(SUPA_URL+'/rest/v1/businesses?user_id=eq.'+CLOUD.user,{headers:ch});
           const bizData=await bizRes.json();
           if(bizData&&bizData[0])CLOUD.bizId=bizData[0].id;
         }catch(e){}
@@ -1846,13 +1852,62 @@ function renderAdmin(scr){
   const cloudInfo=document.createElement('div');
   cloudInfo.innerHTML='<div style="font-size:14px;font-weight:600;color:var(--st)">Connected</div><div style="font-size:12px;color:var(--t3);margin-top:2px">'+S.cloudEmail+'</div><div style="font-size:12px;color:var(--t3)">'+S.cloudBizName+'</div>';
   const cloudBtns=document.createElement('div');cloudBtns.style.cssText='display:flex;flex-direction:column;gap:6px';
+  // Sync diagnostic log box
+  const syncLog=document.createElement('div');syncLog.id='syncLog';
+  syncLog.style.cssText='display:none;font-size:11px;font-family:monospace;background:var(--bg0);border:1px solid var(--b2);border-radius:8px;padding:10px 12px;line-height:1.8;color:var(--t2);margin-top:4px;max-height:180px;overflow-y:auto';
+  function logSync(msg,ok){
+    syncLog.style.display='block';
+    const line=document.createElement('div');
+    line.style.color=ok===true?'var(--st)':ok===false?'var(--dt)':'var(--t2)';
+    line.textContent=(ok===true?'✓ ':ok===false?'✗ ':'→ ')+msg;
+    syncLog.appendChild(line);syncLog.scrollTop=syncLog.scrollHeight;
+  }
   const syncBtn=document.createElement('button');syncBtn.className='abtn';syncBtn.textContent='Sync now';
   syncBtn.onclick=async function(){
+    syncLog.innerHTML='';syncLog.style.display='block';
     syncBtn.textContent='Syncing...';syncBtn.style.opacity='0.6';
-    await saveProductsToCloud();
-    await saveSettingsToCloud();
-    await loadCloudData();
-    render();toast('Sync complete');
+    logSync('Starting sync...');
+    // Check CLOUD state
+    logSync('Token: '+(CLOUD.token?'present ('+CLOUD.token.slice(0,12)+'...)':'MISSING'),!!CLOUD.token);
+    logSync('BizId: '+(CLOUD.bizId||'MISSING'),!!CLOUD.bizId);
+    logSync('Products local: '+S.prods.length+' items');
+    if(!CLOUD.token||!CLOUD.bizId){
+      logSync('Cannot sync — not connected. Sign out and sign in again.',false);
+      toast('Not connected. Sign out and sign in again.');
+      syncBtn.textContent='Sync now';syncBtn.style.opacity='1';return;
+    }
+    // Test connection first
+    logSync('Testing connection...');
+    try{
+      const testRes=await fetch(SUPA_URL+'/rest/v1/businesses?id=eq.'+CLOUD.bizId,{headers:cloudHeaders()});
+      if(!testRes.ok){
+        logSync('Connection test failed: HTTP '+testRes.status+' — session expired',false);
+        logSync('→ Sign out and sign in again to refresh your session',false);
+        toast('Session expired — sign out and sign in again.');
+        syncBtn.textContent='Sync now';syncBtn.style.opacity='1';return;
+      }
+      const bizData=await testRes.json();
+      logSync('Connected to: '+(bizData[0]&&bizData[0].name||'(unnamed business)'),true);
+    }catch(e){
+      logSync('Network error: '+e.message,false);
+      syncBtn.textContent='Sync now';syncBtn.style.opacity='1';return;
+    }
+    // Push products
+    logSync('Pushing '+S.prods.length+' products...');
+    const prodOk=await saveProductsToCloud();
+    logSync(prodOk?'Products pushed OK':'Products push FAILED — check console for details',prodOk);
+    if(!prodOk){toast('Sync failed — products not saved.');syncBtn.textContent='Sync now';syncBtn.style.opacity='1';return;}
+    // Push settings
+    logSync('Pushing settings...');
+    const settOk=await saveSettingsToCloud();
+    logSync(settOk?'Settings pushed OK':'Settings push failed (non-critical)',settOk);
+    // Pull from cloud
+    logSync('Pulling latest data from cloud...');
+    await loadCloudData(true);
+    logSync('Done! '+S.prods.length+' products synced.',true);
+    render();
+    // Re-attach log since render() wiped the DOM
+    toast('Sync complete — '+S.prods.length+' products pushed');
     syncBtn.textContent='Sync now';syncBtn.style.opacity='1';
   };
   const signOutBtn=document.createElement('button');signOutBtn.className='abtn';signOutBtn.style.color='var(--dt)';signOutBtn.textContent='Sign out';
@@ -1863,7 +1918,7 @@ function renderAdmin(scr){
       render();
     }
   };
-  cloudBtns.appendChild(syncBtn);cloudBtns.appendChild(signOutBtn);
+  cloudBtns.appendChild(syncBtn);cloudBtns.appendChild(signOutBtn);cloudBtns.appendChild(syncLog);
   cloudRow.appendChild(cloudInfo);cloudRow.appendChild(cloudBtns);
   secCloud.appendChild(cloudRow);scroll.appendChild(secCloud);
 
