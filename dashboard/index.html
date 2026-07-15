@@ -301,8 +301,37 @@ function saveSession(){localStorage.setItem('apos_dash',JSON.stringify(SESSION))
 function loadSession(){try{const s=JSON.parse(localStorage.getItem('apos_dash')||'{}');if(s.token){SESSION=s;if(!SESSION.settings)SESSION.settings={};return true;}}catch(e){}return false;}
 
 async function loadData(){
-  if(!SESSION.token||!SESSION.bizId){
-    console.warn('[ArroyoDash] loadData skipped - token:',!!SESSION.token,'bizId:',SESSION.bizId);
+  if(!SESSION.token){
+    console.warn('[ArroyoDash] loadData skipped - no token');
+    return;
+  }
+  // Always verify and auto-correct bizId from Supabase — no logout needed
+  try{
+    const h={'apikey':SB_KEY,'Authorization':'Bearer '+SESSION.token,'Content-Type':'application/json'};
+    // Step 1: check POS localStorage for bizId (same browser, most reliable)
+    try{
+      const posCloud=JSON.parse(localStorage.getItem('arroyo_cloud')||'{}');
+      if(posCloud&&posCloud.bizId&&posCloud.bizId!==SESSION.bizId){
+        console.log('[ArroyoDash] Auto-correcting bizId from POS localStorage:',posCloud.bizId);
+        SESSION.bizId=posCloud.bizId;saveSession();
+      }
+    }catch(e){}
+    // Step 2: always fetch correct bizId from Supabase to catch cross-device mismatches
+    const bizRes=await fetch(SB_URL+'/rest/v1/businesses?user_id=eq.'+SESSION.user+'&order=created_at.asc&limit=1',{headers:h});
+    if(bizRes.ok){
+      const bizData=await bizRes.json();
+      if(bizData&&bizData[0]){
+        if(bizData[0].id!==SESSION.bizId){
+          console.log('[ArroyoDash] Auto-correcting bizId from Supabase:',bizData[0].id,'was:',SESSION.bizId);
+          SESSION.bizId=bizData[0].id;
+          SESSION.bizName=bizData[0].name;
+          saveSession();
+        }
+      }
+    }
+  }catch(e){console.warn('[ArroyoDash] bizId check failed:',e);}
+  if(!SESSION.bizId){
+    console.warn('[ArroyoDash] loadData skipped - no bizId after correction');
     return;
   }
   UI.loading=true;render();
