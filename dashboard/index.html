@@ -264,7 +264,7 @@ html,body{min-height:100%;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI
 <script>
 const SB_URL='https://btfazallxcbmiitbcmkv.supabase.co';
 const SB_KEY='eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImJ0ZmF6YWxseGNibWlpdGJjbWt2Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODM5NjkwODIsImV4cCI6MjA5OTU0NTA4Mn0.Iu0qjlPttxxqY_LcvTND9Uir3uy71FCv469NjlfiIBE';
-let SESSION={token:null,user:null,bizId:null,bizName:'',email:''};
+let SESSION={token:null,user:null,bizId:null,bizName:'',email:'',settings:{}};
 let D={sales:[],expenses:[],products:[],employees:[],attendance:[],customers:[],credit:[],suppliers:[],pos:[],ingredients:[],recipes:[],wastage:[],orders:[],loans:[],leaves:[]};
 let UI={page:'overview',filter:'week',modal:null,loading:false};
 let CHARTS={};
@@ -298,7 +298,7 @@ async function signOut(){
   localStorage.removeItem('apos_dash');render();
 }
 function saveSession(){localStorage.setItem('apos_dash',JSON.stringify(SESSION));}
-function loadSession(){try{const s=JSON.parse(localStorage.getItem('apos_dash')||'{}');if(s.token){SESSION=s;return true;}}catch(e){}return false;}
+function loadSession(){try{const s=JSON.parse(localStorage.getItem('apos_dash')||'{}');if(s.token){SESSION=s;if(!SESSION.settings)SESSION.settings={};return true;}}catch(e){}return false;}
 
 async function loadData(){
   if(!SESSION.token||!SESSION.bizId){
@@ -328,7 +328,46 @@ async function loadData(){
   const keys=['sales','expenses','products','employees','attendance','customers','credit','suppliers','pos','ingredients','recipes','wastage','orders','loans','leaves'];
   keys.forEach(function(k,i){D[k]=Array.isArray(results[i])?results[i]:[];});
   console.log('[ArroyoDash] Data loaded - sales:',D.sales.length,'expenses:',D.expenses.length,'products:',D.products.length);
-  UI.loading=false;render();
+  UI.loading=false;
+  await loadSettingsFromCloud();
+  render();
+}
+
+async function loadSettingsFromCloud(){
+  if(!SESSION.token||!SESSION.bizId)return;
+  try{
+    const data=await api('/rest/v1/businesses?id=eq.'+SESSION.bizId);
+    if(!data||!data[0]||!data[0].settings)return;
+    const settings=typeof data[0].settings==='string'?JSON.parse(data[0].settings):data[0].settings;
+    // Sync biz name
+    if(settings.biz_name&&settings.biz_name!==SESSION.bizName){
+      SESSION.bizName=settings.biz_name;
+      saveSession();
+    }
+    // Store settings in SESSION for use in render
+    SESSION.settings=settings;
+  }catch(e){}
+}
+
+async function saveSettingsToCloud(patch){
+  if(!SESSION.token||!SESSION.bizId)return;
+  try{
+    // Read current settings first
+    const data=await api('/rest/v1/businesses?id=eq.'+SESSION.bizId);
+    let current={};
+    if(data&&data[0]&&data[0].settings){
+      current=typeof data[0].settings==='string'?JSON.parse(data[0].settings):data[0].settings;
+    }
+    const merged=Object.assign({},current,patch);
+    await api('/rest/v1/businesses?id=eq.'+SESSION.bizId,{
+      method:'PATCH',
+      headers:{'Prefer':'return=representation'},
+      body:JSON.stringify({settings:JSON.stringify(merged),name:merged.biz_name||SESSION.bizName})
+    });
+    SESSION.bizName=merged.biz_name||SESSION.bizName;
+    SESSION.settings=merged;
+    saveSession();
+  }catch(e){}
 }
 
 function filteredSales(){
@@ -475,6 +514,12 @@ function renderAuth(root){
 }
 
 function renderApp(root){
+  // Apply theme color from POS settings if available
+  if(SESSION.settings&&SESSION.settings.theme_color){
+    const hex=SESSION.settings.theme_color;
+    document.documentElement.style.setProperty('--bg',hex);
+    document.documentElement.style.setProperty('--navy',hex);
+  }
   const app=el('div','app');
 
   // Mobile overlay
@@ -494,7 +539,10 @@ function renderApp(root){
   app.appendChild(mTop);
   const sb=el('aside','sidebar');
   const brand=el('div','sb-brand');
-  brand.innerHTML='<div class="sb-ico">AP</div><div><div class="sb-name">Arroyo POS</div><div class="sb-biz">'+SESSION.bizName+'</div></div>';
+  const logoHtml=SESSION.settings&&SESSION.settings.biz_logo
+    ?'<img src="'+SESSION.settings.biz_logo+'" style="width:32px;height:32px;border-radius:8px;object-fit:cover;flex-shrink:0"/>'
+    :'<div class="sb-ico">AP</div>';
+  brand.innerHTML=logoHtml+'<div><div class="sb-name">'+SESSION.bizName+'</div><div class="sb-biz">Arroyo POS</div></div>';
   sb.appendChild(brand);
   const nav=el('div','nav');
   function navSection(lbl){nav.appendChild(el('div','nav-section',lbl));}
