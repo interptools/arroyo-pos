@@ -1077,6 +1077,8 @@ function renderWizard(app){
         }catch(e){}
       }
       S.screen='pos';save();render();toast('Welcome to '+S.bizName+'! 🎉');
+      // Push sample products to cloud now that bizId is set
+      await saveProductsToCloud();
     }
   };
   foot.appendChild(next);
@@ -1845,7 +1847,14 @@ function renderAdmin(scr){
   cloudInfo.innerHTML='<div style="font-size:14px;font-weight:600;color:var(--st)">Connected</div><div style="font-size:12px;color:var(--t3);margin-top:2px">'+S.cloudEmail+'</div><div style="font-size:12px;color:var(--t3)">'+S.cloudBizName+'</div>';
   const cloudBtns=document.createElement('div');cloudBtns.style.cssText='display:flex;flex-direction:column;gap:6px';
   const syncBtn=document.createElement('button');syncBtn.className='abtn';syncBtn.textContent='Sync now';
-  syncBtn.onclick=async function(){syncBtn.textContent='Syncing...';syncBtn.style.opacity='0.6';await loadCloudData();render();toast('Sync complete');};
+  syncBtn.onclick=async function(){
+    syncBtn.textContent='Syncing...';syncBtn.style.opacity='0.6';
+    await saveProductsToCloud();
+    await saveSettingsToCloud();
+    await loadCloudData();
+    render();toast('Sync complete');
+    syncBtn.textContent='Sync now';syncBtn.style.opacity='1';
+  };
   const signOutBtn=document.createElement('button');signOutBtn.className='abtn';signOutBtn.style.color='var(--dt)';signOutBtn.textContent='Sign out';
   signOutBtn.onclick=async function(){
     if(confirm('Sign out of cloud account?\nLocal data stays on this device.')){
