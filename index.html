@@ -1076,11 +1076,22 @@ function renderWizard(app){
       if(CLOUD.token&&CLOUD.user){
         try{
           const ch=cloudHeaders();
-          await fetch(SUPA_URL+'/rest/v1/businesses',{method:'POST',headers:ch,body:JSON.stringify({user_id:CLOUD.user,name:WIZ.bizName,biz_type:WIZ.bizType})});
-          const bizRes=await fetch(SUPA_URL+'/rest/v1/businesses?user_id=eq.'+CLOUD.user,{headers:ch});
-          const bizData=await bizRes.json();
-          if(bizData&&bizData[0])CLOUD.bizId=bizData[0].id;
-        }catch(e){}
+          // Check if business already exists for this user
+          const existRes=await fetch(SUPA_URL+'/rest/v1/businesses?user_id=eq.'+CLOUD.user+'&order=created_at.asc',{headers:ch});
+          const existData=await existRes.json();
+          if(existData&&existData.length>0){
+            // Reuse existing business — just update name/type
+            CLOUD.bizId=existData[0].id;
+            await fetch(SUPA_URL+'/rest/v1/businesses?id=eq.'+CLOUD.bizId,{method:'PATCH',headers:ch,body:JSON.stringify({name:WIZ.bizName,biz_type:WIZ.bizType})});
+          } else {
+            // Create new business
+            const createRes=await fetch(SUPA_URL+'/rest/v1/businesses',{method:'POST',headers:{...ch,'Prefer':'return=representation'},body:JSON.stringify({user_id:CLOUD.user,name:WIZ.bizName,biz_type:WIZ.bizType})});
+            const created=await createRes.json();
+            if(created&&created[0])CLOUD.bizId=created[0].id;
+          }
+          save();saveSession&&saveSession();
+          localStorage.setItem('arroyo_cloud',JSON.stringify({user:CLOUD.user,token:CLOUD.token,bizId:CLOUD.bizId,email:S.cloudEmail,bizName:WIZ.bizName}));
+        }catch(e){console.error('Wizard biz sync error:',e);}
       }
       S.screen='pos';save();render();toast('Welcome to '+S.bizName+'! 🎉');
       // Push sample products to cloud now that bizId is set
@@ -2120,7 +2131,13 @@ function renderAdmin(scr){
   const dr2=document.createElement('div');dr2.style.cssText='display:flex;align-items:center;justify-content:space-between;gap:10px;margin-top:8px';
   dr2.innerHTML='<span style="font-size:13px;color:var(--t2)">Wipe all data.</span>';
   const factBtn=document.createElement('button');factBtn.className='abtn';factBtn.style.color='var(--dt)';factBtn.textContent='Factory reset';
-  factBtn.onclick=function(){if(confirm('Wipe ALL data?')){if(confirm('Final confirmation?')){localStorage.removeItem('arroyo_pos');S={screen:'biz',biz:null,bizName:'',prods:[],cats:[],cart:[],cat:'All',search:'',disc:0,discType:'%',pass:'1234',locked:true,nid:10,sales:[],salesTotal:0,modal:null,histFilter:'all',cashTendered:0,themeColor:'#111110',cartOpen:false};render();}}};
+  factBtn.onclick=function(){if(confirm('Wipe ALL data?')){if(confirm('Final confirmation?')){
+    localStorage.removeItem('arroyo_pos');
+    localStorage.removeItem('arroyo_cloud');
+    CLOUD={user:null,token:null,bizId:null};
+    S={screen:'biz',biz:null,bizName:'',prods:[],cats:[],cart:[],cat:'All',search:'',disc:0,discType:'%',pass:'1234',locked:true,nid:10,sales:[],salesTotal:0,modal:null,histFilter:'all',cashTendered:0,themeColor:'#111110',cartOpen:false,cashiers:[],cashierNid:1,activeCashier:null,shiftStart:null,alertDismissed:false,cloudEmail:'',cloudBizName:'',authScreen:'login',selectedCustomer:null,chargeToUtang:false,cloudCustomers:[],cloudAttEmployees:[],expenses:[],expenseNid:1,expFilter:'today',dailyGoal:0,requireRef:false,bizLogo:null};
+    render();
+  }}};
   dr2.appendChild(factBtn);sec6.appendChild(dr2);scroll.appendChild(sec6);
 
   // Credit
@@ -2217,6 +2234,99 @@ function renderAbout(scr){
     +'<div class="divl"></div>'
     +'<p style="font-size:13px;color:var(--t3);line-height:1.7">For customization or support, contact via phone or email.</p>';
   body.appendChild(creatorCard);
+
+  // ── Diagnostics card ──
+  const diagCard=document.createElement('div');diagCard.className='about-card';
+  diagCard.style.cssText='gap:10px;width:100%;max-width:380px';
+  diagCard.innerHTML='<div style="font-size:16px;font-weight:700;width:100%">🔧 System Diagnostics</div>'
+    +'<div style="font-size:12px;color:var(--t3);width:100%">Tap Run to check all connections and data.</div>';
+  const diagLog=document.createElement('div');diagLog.id='diagLog';
+  diagLog.style.cssText='width:100%;font-size:11px;font-family:monospace;background:var(--bg0);border:1px solid var(--b2);border-radius:8px;padding:10px 12px;line-height:2;color:var(--t2);display:none;max-height:320px;overflow-y:auto';
+  const diagBtn=document.createElement('button');diagBtn.className='abtn pri';diagBtn.style.cssText='width:100%;padding:12px;font-size:14px;font-weight:700';diagBtn.textContent='Run diagnostics';
+  diagBtn.onclick=async function(){
+    diagBtn.disabled=true;diagBtn.textContent='Running...';
+    diagLog.innerHTML='';diagLog.style.display='block';
+    function log(msg,ok){
+      const d=document.createElement('div');
+      d.style.color=ok===true?'var(--st)':ok===false?'var(--dt)':ok==='warn'?'var(--wt)':'var(--t2)';
+      d.innerHTML=(ok===true?'✓ ':ok===false?'✗ ':ok==='warn'?'⚠ ':'→ ')+msg;
+      diagLog.appendChild(d);diagLog.scrollTop=diagLog.scrollHeight;
+    }
+    log('=== LOCAL STATE ===');
+    log('App version: v'+CR.ver);
+    log('Installed: '+S.installed);
+    log('Business type: '+(S.biz||'none'));
+    log('Shop name: '+(S.bizName||'none'));
+    log('Products (local): '+S.prods.length);
+    log('Sales (local): '+S.sales.length);
+    log('Cashiers: '+S.cashiers.length);
+    log('Active cashier: '+(S.activeCashier?S.activeCashier.name:'none'));
+    log('');
+    log('=== CLOUD SESSION ===');
+    log('Token: '+(CLOUD.token?'present ('+CLOUD.token.slice(0,16)+'...)':'MISSING'),!!CLOUD.token);
+    log('User ID: '+(CLOUD.user?CLOUD.user.slice(0,16)+'...':'MISSING'),!!CLOUD.user);
+    log('Biz ID: '+(CLOUD.bizId?CLOUD.bizId:'MISSING'),!!CLOUD.bizId);
+    log('Email: '+(S.cloudEmail||'not set'),!!S.cloudEmail);
+    if(!CLOUD.token){log('Cannot run cloud checks — not signed in.',false);diagBtn.disabled=false;diagBtn.textContent='Run diagnostics';return;}
+    log('');
+    log('=== SUPABASE CONNECTION ===');
+    try{
+      const r=await fetch(SUPA_URL+'/rest/v1/businesses?id=eq.'+CLOUD.bizId,{headers:cloudHeaders()});
+      if(r.ok){
+        const d=await r.json();
+        if(d&&d[0]){log('Business record found: "'+d[0].name+'"',true);log('Has settings: '+(!!d[0].settings),!!d[0].settings);}
+        else log('Business record NOT found in Supabase — wrong bizId?',false);
+      } else {
+        const txt=await r.text();
+        if(r.status===401)log('Auth failed (401) — session expired. Sign out and sign in.',false);
+        else log('Business fetch failed: HTTP '+r.status,false);
+      }
+    }catch(e){log('Network error: '+e.message,false);}
+    log('');
+    log('=== PRODUCTS ===');
+    try{
+      const r=await fetch(SUPA_URL+'/rest/v1/products?biz_id=eq.'+CLOUD.bizId,{headers:cloudHeaders()});
+      if(r.ok){const d=await r.json();log('Products in Supabase: '+d.length,(d.length>0));
+        if(d.length!==S.prods.length)log('Mismatch: local has '+S.prods.length+' but cloud has '+d.length,'warn');
+        else log('Local and cloud product count match',true);
+      } else log('Products fetch failed: HTTP '+r.status,false);
+    }catch(e){log('Products error: '+e.message,false);}
+    log('');
+    log('=== EMPLOYEES ===');
+    try{
+      const r=await fetch(SUPA_URL+'/rest/v1/employees?biz_id=eq.'+CLOUD.bizId+'&active=eq.true',{headers:cloudHeaders()});
+      if(r.ok){const d=await r.json();log('Active employees in Supabase: '+d.length,(d.length>=0),d.length===0?'warn':true);
+      } else log('Employees fetch failed: HTTP '+r.status,false);
+    }catch(e){log('Employees error: '+e.message,false);}
+    log('');
+    log('=== INGREDIENTS ===');
+    try{
+      const r=await fetch(SUPA_URL+'/rest/v1/ingredients?biz_id=eq.'+CLOUD.bizId,{headers:cloudHeaders()});
+      if(r.ok){const d=await r.json();log('Ingredients in Supabase: '+d.length,d.length>0);}
+      else log('Ingredients fetch failed: HTTP '+r.status,false);
+    }catch(e){log('Ingredients error: '+e.message,false);}
+    log('');
+    log('=== SALES ===');
+    try{
+      const r=await fetch(SUPA_URL+'/rest/v1/sales?biz_id=eq.'+CLOUD.bizId+'&limit=1',{headers:cloudHeaders()});
+      if(r.ok){const d=await r.json();log('Sales records in Supabase: '+(d.length>0?'found (latest: '+d[0].txn_id+')':'none yet'),d.length>0?true:'warn');}
+      else log('Sales fetch failed: HTTP '+r.status,false);
+    }catch(e){log('Sales error: '+e.message,false);}
+    log('');
+    log('=== UPDATE SERVER ===');
+    try{
+      const r=await fetch(VERSION_URL+'?t='+Date.now());
+      if(r.ok){const d=await r.json();const latest=d.version||'?';const upToDate=latest===CR.ver;
+        log('Update server reachable',true);
+        log('Latest version: v'+latest+' (you have v'+CR.ver+')',upToDate?true:'warn');
+      } else log('Update server unreachable: HTTP '+r.status,'warn');
+    }catch(e){log('Update server error (may be offline): '+e.message,'warn');}
+    log('');
+    log('=== DONE ===',true);
+    diagBtn.disabled=false;diagBtn.textContent='Run diagnostics';
+  };
+  diagCard.appendChild(diagBtn);diagCard.appendChild(diagLog);
+  body.appendChild(diagCard);
 
   scr.appendChild(body);
 }
