@@ -582,14 +582,22 @@ function renderApp(root){
   const syncBtn=el('button','so-btn','<i class="ti ti-refresh" style="font-size:14px;vertical-align:-2px;margin-right:4px"></i>Sync data');
   syncBtn.onclick=async function(){
     syncBtn.textContent='Finding data...';
-    // Re-sync bizId from POS localStorage first
+    // Step 1: try to get bizId from POS localStorage (same browser)
     try{
       const posCloud=JSON.parse(localStorage.getItem('arroyo_cloud')||'{}');
       if(posCloud&&posCloud.bizId&&posCloud.bizId!==SESSION.bizId){
         SESSION.bizId=posCloud.bizId;saveSession();
-        console.log('[ArroyoDash] Sync updated bizId from POS:',SESSION.bizId);
+        console.log('[ArroyoDash] Sync updated bizId from POS localStorage:',SESSION.bizId);
       }
     }catch(e){}
+    // Step 2: if still no bizId, fetch fresh from Supabase using auth token
+    if(!SESSION.bizId&&SESSION.token){
+      try{
+        const h={'apikey':SB_KEY,'Authorization':'Bearer '+SESSION.token,'Content-Type':'application/json'};
+        const r=await fetch(SB_URL+'/rest/v1/businesses?user_id=eq.'+SESSION.user+'&order=created_at.asc&limit=1',{headers:h});
+        if(r.ok){const d=await r.json();if(d&&d[0]){SESSION.bizId=d[0].id;SESSION.bizName=d[0].name;saveSession();console.log('[ArroyoDash] BizId fetched from Supabase:',SESSION.bizId);}}
+      }catch(e){}
+    }
     await loadData();
     syncBtn.innerHTML='<i class="ti ti-refresh" style="font-size:14px;vertical-align:-2px;margin-right:4px"></i>Sync data';
   };
