@@ -1829,12 +1829,16 @@ function renderModal(root){
     modalBtns(box,function(){UI.modal=null;render();},async function(){
       const ingVal=gv('rIng');const qty=parseFloat(gv('rQty'))||1;
       if(!ingVal){alert('Select an ingredient');return;}
-      const[ingId,ingName,ingUnit]=ingVal.split('|');
+      if(!SESSION.bizId){alert('No business found. Please sign out and sign in again.');return;}
+      const parts=ingVal.split('|');
+      const ingId=parts[0];const ingName=parts[1];
+      let result;
       if(isNew){
-        await api('/rest/v1/recipes',{method:'POST',headers:{'Prefer':'return=representation'},body:JSON.stringify({biz_id:SESSION.bizId,product_name:p.name,ingredient_id:ingId,ingredient_name:ingName,qty_used:qty})});
+        result=await api('/rest/v1/recipes',{method:'POST',headers:{'Prefer':'return=representation'},body:JSON.stringify({biz_id:SESSION.bizId,product_name:p.name,ingredient_id:ingId,ingredient_name:ingName,qty_used:qty})});
       } else {
-        await api('/rest/v1/recipes?id=eq.'+r.id,{method:'PATCH',headers:{'Prefer':'return=representation'},body:JSON.stringify({ingredient_id:ingId,ingredient_name:ingName,qty_used:qty})});
+        result=await api('/rest/v1/recipes?id=eq.'+r.id,{method:'PATCH',headers:{'Prefer':'return=representation'},body:JSON.stringify({ingredient_id:ingId,ingredient_name:ingName,qty_used:qty})});
       }
+      if(result===null){alert('Save failed. Check your connection and try again.');return;}
       UI.modal=null;await loadData();
     },isNew?'Add':'Save');
 
@@ -1902,13 +1906,8 @@ function renderModal(root){
     modalBtns(box,close,async function(){
       const name=gv('iName');
       if(!name){alert('Enter ingredient name');return;}
-      let bizId=SESSION.bizId;
-      if(!bizId){
-        const biz=await api('/rest/v1/businesses?order=created_at.asc&limit=1');
-        if(biz&&biz[0]){SESSION.bizId=biz[0].id;bizId=biz[0].id;saveSession();}
-        else{alert('Cannot find business. Please sign out and sign in again.');return;}
-      }
-      const p={biz_id:bizId,name,unit:gv('iUnit')||'g',stock:parseFloat(gv('iStock'))||0,low_threshold:parseFloat(gv('iThresh'))||5,cost_per_unit:parseFloat(gv('iCost'))||0};
+      if(!SESSION.bizId){alert('No business found. Please sign out and sign in again.');return;}
+      const p={biz_id:SESSION.bizId,name,unit:gv('iUnit')||'g',stock:parseFloat(gv('iStock'))||0,low_threshold:parseFloat(gv('iThresh'))||5,cost_per_unit:parseFloat(gv('iCost'))||0};
       const endpoint=it.id?'/rest/v1/ingredients?id=eq.'+it.id:'/rest/v1/ingredients';
       const method=it.id?'PATCH':'POST';
       const result=await api(endpoint,{method,headers:{'Prefer':'return=representation'},body:JSON.stringify(p)});
@@ -1956,7 +1955,11 @@ function exportCSV(sales){
   const a=document.createElement('a');a.href=URL.createObjectURL(new Blob([csv],{type:'text/csv'}));a.download='sales-'+new Date().toISOString().slice(0,10)+'.csv';a.click();
 }
 
-if(loadSession()){
+// Apply any pending dashboard update downloaded by POS applyUpdate()
+try{
+  const pending=localStorage.getItem('arroyo_dash_update');
+  if(pending){localStorage.removeItem('arroyo_dash_update');document.open('text/html');document.write(pending);document.close();}
+  else if(loadSession()){
   (async function(){
     try{
       const headers={'apikey':SB_KEY,'Authorization':'Bearer '+SESSION.token,'Content-Type':'application/json'};
@@ -2012,7 +2015,8 @@ if(loadSession()){
     }catch(e){console.warn('[ArroyoDash] BizId check failed:',e);}
     loadData();
   })();
-}else{render();}
+  }else{render();}
+}catch(e){render();}
 </script>
 </body>
 </html>
