@@ -1666,38 +1666,6 @@ function renderHist(scr){
       card.onclick=function(){openModal({type:'viewtx',tx:s});};
       list.appendChild(card);
     });
-    // Items sold breakdown for this day
-    const validTxs=txs.filter(s=>!s.voided);
-    if(validTxs.length>0){
-      const itemMap={};
-      validTxs.forEach(s=>s.items.forEach(it=>{
-        if(!itemMap[it.name])itemMap[it.name]={qty:0,total:0,price:it.price};
-        itemMap[it.name].qty+=it.qty;
-        itemMap[it.name].total+=it.price*it.qty;
-      }));
-      const sorted=Object.entries(itemMap).sort((a,b)=>b[1].qty-a[1].qty);
-      const itBox=document.createElement('div');
-      itBox.style.cssText='background:var(--bg2);border:1px solid var(--b1);border-radius:12px;padding:10px 12px;margin-bottom:12px';
-      const itHd=document.createElement('div');itHd.style.cssText='font-size:10px;font-weight:700;color:var(--t3);text-transform:uppercase;letter-spacing:0.5px;margin-bottom:8px;display:flex;justify-content:space-between';
-      itHd.innerHTML='<span>Items sold today</span><span>Qty &nbsp;&nbsp;&nbsp;&nbsp; Total</span>';
-      itBox.appendChild(itHd);
-      sorted.forEach(([name,d])=>{
-        const row=document.createElement('div');
-        row.style.cssText='display:flex;justify-content:space-between;align-items:center;padding:5px 0;border-bottom:1px solid var(--b1);font-size:13px';
-        row.innerHTML='<span style="color:var(--t1);font-weight:600;flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">'+name+'</span>'
-          +'<span style="color:var(--t2);font-weight:700;min-width:36px;text-align:center">'+d.qty+'</span>'
-          +'<span style="color:var(--ac);font-weight:700;min-width:80px;text-align:right">'+fmt(d.total)+'</span>';
-        itBox.appendChild(row);
-      });
-      const totRow=document.createElement('div');
-      totRow.style.cssText='display:flex;justify-content:space-between;padding:6px 0 0;font-size:13px;font-weight:800';
-      const totalItemQty=sorted.reduce((a,[,d])=>a+d.qty,0);
-      totRow.innerHTML='<span style="color:var(--t1)">Total items sold</span>'
-        +'<span style="color:var(--t2);min-width:36px;text-align:center">'+totalItemQty+'</span>'
-        +'<span style="color:var(--ac);min-width:80px;text-align:right">'+fmt(dayTot)+'</span>';
-      itBox.appendChild(totRow);
-      list.appendChild(itBox);
-    }
   });
   scr.appendChild(list);
 }
@@ -1859,42 +1827,6 @@ function renderAdmin(scr){
   const tx30=S.sales.filter(function(s){return new Date(s.date)>=new Date(Date.now()-30*86400000);});
   const avg=S.sales.length?S.salesTotal/S.sales.length:0;const sec3=document.createElement('div');sec3.className='asec';
   sec3.innerHTML='<div class="asec-t">Sales summary</div><div class="stats" style="padding:0;grid-template-columns:repeat(3,1fr)"><div class="stat"><div class="stat-l">Transactions</div><div class="stat-v">'+S.sales.length+'</div></div><div class="stat"><div class="stat-l">Revenue</div><div class="stat-v" style="font-size:14px">'+fmt(S.salesTotal)+'</div></div><div class="stat"><div class="stat-l">Avg sale</div><div class="stat-v" style="font-size:14px">'+fmt(avg)+'</div></div></div><div class="stats" style="padding:8px 0 0;grid-template-columns:repeat(3,1fr)"><div class="stat"><div class="stat-l">30-day txns</div><div class="stat-v">'+tx30.length+'</div></div><div class="stat"><div class="stat-l">30-day rev.</div><div class="stat-v" style="font-size:14px">'+fmt(tx30.reduce((a,s)=>a+s.total,0))+'</div></div><div class="stat"><div class="stat-l">Products</div><div class="stat-v">'+S.prods.length+'</div></div></div>';
-
-  // Top items sold (all-time)
-  const validSales=S.sales.filter(function(s){return !s.voided;});
-  if(validSales.length>0){
-    const adminItemMap={};
-    validSales.forEach(function(s){s.items.forEach(function(it){
-      if(!adminItemMap[it.name])adminItemMap[it.name]={qty:0,total:0};
-      adminItemMap[it.name].qty+=it.qty;
-      adminItemMap[it.name].total+=it.price*it.qty;
-    });});
-    const adminSorted=Object.entries(adminItemMap).sort(function(a,b){return b[1].qty-a[1].qty;});
-    const aiHd=document.createElement('div');aiHd.style.cssText='font-size:10px;font-weight:700;color:var(--t3);text-transform:uppercase;letter-spacing:0.5px;margin:12px 0 6px';aiHd.textContent='Items Sold (all time)';sec3.appendChild(aiHd);
-    const aiBox=document.createElement('div');aiBox.style.cssText='background:var(--bg1);border-radius:10px;overflow:hidden';
-    const aiHead=document.createElement('div');
-    aiHead.style.cssText='display:grid;grid-template-columns:1fr 52px 90px;padding:7px 10px;font-size:10px;font-weight:700;color:var(--t3);text-transform:uppercase;letter-spacing:0.4px;border-bottom:1px solid var(--b1)';
-    aiHead.innerHTML='<span>Item</span><span style="text-align:center">Qty</span><span style="text-align:right">Revenue</span>';
-    aiBox.appendChild(aiHead);
-    adminSorted.slice(0,15).forEach(function(entry){
-      const row=document.createElement('div');
-      row.style.cssText='display:grid;grid-template-columns:1fr 52px 90px;padding:7px 10px;font-size:13px;border-bottom:1px solid var(--b1);align-items:center';
-      row.innerHTML='<span style="font-weight:600;color:var(--t1);overflow:hidden;text-overflow:ellipsis;white-space:nowrap">'+entry[0]+'</span>'
-        +'<span style="text-align:center;font-weight:700;color:var(--t2)">'+entry[1].qty+'</span>'
-        +'<span style="text-align:right;font-weight:700;color:var(--ac)">'+fmt(entry[1].total)+'</span>';
-      aiBox.appendChild(row);
-    });
-    const aiTotRow=document.createElement('div');
-    aiTotRow.style.cssText='display:grid;grid-template-columns:1fr 52px 90px;padding:8px 10px;font-size:13px;font-weight:800';
-    const aiTotQty=adminSorted.reduce(function(a,e){return a+e[1].qty;},0);
-    const aiTotAmt=adminSorted.reduce(function(a,e){return a+e[1].total;},0);
-    aiTotRow.innerHTML='<span style="color:var(--t1)">Total</span>'
-      +'<span style="text-align:center;color:var(--t2)">'+aiTotQty+'</span>'
-      +'<span style="text-align:right;color:var(--ac)">'+fmt(aiTotAmt)+'</span>';
-    aiBox.appendChild(aiTotRow);
-    sec3.appendChild(aiBox);
-  }
-
   const clrSalesRow=document.createElement('div');clrSalesRow.className='abtnrow';
   const clrSalesBtn=document.createElement('button');clrSalesBtn.className='abtn';clrSalesBtn.textContent='Clear sales data';
   clrSalesBtn.onclick=function(){if(confirm('Clear all sales data?')){S.sales=[];S.salesTotal=0;save();render();toast('Cleared');}};
@@ -2336,7 +2268,7 @@ function renderModal(app){
     body.appendChild(grid);
 
     const btns=document.createElement('div');btns.className='mbtns';
-    if(!isNew){const del=document.createElement('button');del.className='mdel';del.textContent='Delete';del.onclick=function(){S.prods=S.prods.filter(x=>x.id!==p.id);S.cart=S.cart.filter(x=>x.id!==p.id);const cs=[...new Set(S.prods.map(x=>x.cat))];S.cats=['All',...cs];save();closeModal();toast('Deleted');};btns.appendChild(del);}
+    if(!isNew){const del=document.createElement('button');del.className='mdel';del.textContent='Delete';del.onclick=function(){S.prods=S.prods.filter(x=>x.id!==p.id);S.cart=S.cart.filter(x=>x.id!==p.id);const cs=[...new Set(S.prods.map(x=>x.cat))];S.cats=['All',...cs];save();saveProductsToCloud();closeModal();toast('Deleted');};btns.appendChild(del);}
     const cancel=document.createElement('button');cancel.textContent='Cancel';cancel.onclick=closeModal;
     const save2=document.createElement('button');save2.className='mpri';save2.textContent='Save';
     save2.onclick=function(){
@@ -2360,7 +2292,7 @@ function renderModal(app){
     const btns=document.createElement('div');btns.className='mbtns';
     const cancel=document.createElement('button');cancel.textContent='Cancel';cancel.onclick=closeModal;
     const del=document.createElement('button');del.className='mpri';del.style.background='var(--df)';del.textContent='Delete';
-    del.onclick=function(){S.prods=S.prods.filter(x=>x.id!==m.pid);S.cart=S.cart.filter(x=>x.id!==m.pid);const cs=[...new Set(S.prods.map(x=>x.cat))];S.cats=['All',...cs];save();closeModal();toast('Deleted');};
+    del.onclick=function(){S.prods=S.prods.filter(x=>x.id!==m.pid);S.cart=S.cart.filter(x=>x.id!==m.pid);const cs=[...new Set(S.prods.map(x=>x.cat))];S.cats=['All',...cs];save();saveProductsToCloud();closeModal();toast('Deleted');};
     btns.appendChild(cancel);btns.appendChild(del);body.appendChild(btns);
   } else if(m.type==='dailyReport'){
     const date=m.date;const range=m.range;const label=m.label||date;
@@ -2387,41 +2319,6 @@ function renderModal(app){
       sumGrid.appendChild(box);
     });
     body.appendChild(sumGrid);
-
-    // Items sold summary
-    const validFiltered=filtered.filter(function(s){return !s.voided;});
-    if(validFiltered.length>0){
-      const itemMap2={};
-      validFiltered.forEach(function(s){s.items.forEach(function(it){
-        if(!itemMap2[it.name])itemMap2[it.name]={qty:0,total:0};
-        itemMap2[it.name].qty+=it.qty;
-        itemMap2[it.name].total+=it.price*it.qty;
-      });});
-      const sortedItems=Object.entries(itemMap2).sort(function(a,b){return b[1].qty-a[1].qty;});
-      const isHd=document.createElement('div');isHd.style.cssText='font-size:12px;font-weight:700;color:var(--t3);text-transform:uppercase;letter-spacing:0.5px;padding:4px 0 6px';isHd.textContent='Items Sold';body.appendChild(isHd);
-      const isBox=document.createElement('div');isBox.style.cssText='background:var(--bg0);border-radius:12px;padding:12px;overflow:hidden';
-      const isHeader=document.createElement('div');
-      isHeader.style.cssText='display:grid;grid-template-columns:1fr 52px 90px;gap:4px;font-size:10px;font-weight:700;color:var(--t3);text-transform:uppercase;letter-spacing:0.4px;padding-bottom:6px;border-bottom:1px solid var(--b1);margin-bottom:4px';
-      isHeader.innerHTML='<span>Item</span><span style="text-align:center">Qty</span><span style="text-align:right">Total</span>';
-      isBox.appendChild(isHeader);
-      sortedItems.forEach(function(entry){
-        const nm=entry[0],d=entry[1];
-        const irow=document.createElement('div');
-        irow.style.cssText='display:grid;grid-template-columns:1fr 52px 90px;gap:4px;padding:6px 0;border-bottom:1px solid var(--b1);font-size:13px;align-items:center';
-        irow.innerHTML='<span style="font-weight:600;color:var(--t1);overflow:hidden;text-overflow:ellipsis;white-space:nowrap">'+nm+'</span>'
-          +'<span style="text-align:center;font-weight:700;color:var(--t2)">'+d.qty+'</span>'
-          +'<span style="text-align:right;font-weight:700;color:var(--ac)">'+fmt(d.total)+'</span>';
-        isBox.appendChild(irow);
-      });
-      const totIRow=document.createElement('div');
-      totIRow.style.cssText='display:grid;grid-template-columns:1fr 52px 90px;gap:4px;padding:7px 0 2px;font-size:13px;font-weight:800';
-      const totalQtyAll=sortedItems.reduce(function(a,e){return a+e[1].qty;},0);
-      totIRow.innerHTML='<span style="color:var(--t1)">Total</span>'
-        +'<span style="text-align:center;color:var(--t2)">'+totalQtyAll+'</span>'
-        +'<span style="text-align:right;color:var(--ac)">'+fmt(totalAmt)+'</span>';
-      isBox.appendChild(totIRow);
-      body.appendChild(isBox);
-    }
 
     // Transaction list
     if(filtered.length>0){
@@ -2490,25 +2387,6 @@ function renderModal(app){
         +'<tr><td>Card</td><td class="r">'+fmt(cardAmt)+'</td></tr>'
         +'<tr><td>GCash</td><td class="r">'+fmt(gcashAmt)+'</td></tr>'
         +'</table><hr/>';
-      // Items sold summary in print
-      const printValidF=filtered.filter(function(s){return !s.voided;});
-      if(printValidF.length>0){
-        const printItemMap={};
-        printValidF.forEach(function(s){s.items.forEach(function(it){
-          if(!printItemMap[it.name])printItemMap[it.name]={qty:0,total:0};
-          printItemMap[it.name].qty+=it.qty;
-          printItemMap[it.name].total+=it.price*it.qty;
-        });});
-        const printSorted=Object.entries(printItemMap).sort(function(a,b){return b[1].qty-a[1].qty;});
-        html+='<strong>ITEMS SOLD</strong><br/>';
-        html+='<table><tr class="hd"><td>Item</td><td class="r">Qty</td><td class="r">Total</td></tr>';
-        printSorted.forEach(function(e){
-          html+='<tr><td>'+e[0]+'</td><td class="r">'+e[1].qty+'</td><td class="r">'+fmt(e[1].total)+'</td></tr>';
-        });
-        const pTotalQty=printSorted.reduce(function(a,e){return a+e[1].qty;},0);
-        html+='<tr style="font-weight:bold;border-top:2px solid #000"><td>Total</td><td class="r">'+pTotalQty+'</td><td class="r">'+fmt(totalAmt)+'</td></tr>';
-        html+='</table><hr/>';
-      }
       html+='<strong>TRANSACTIONS</strong><br/>';
       filtered.slice().reverse().forEach(function(s){
         html+='<div class="tx">';
