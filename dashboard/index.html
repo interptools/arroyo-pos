@@ -723,7 +723,7 @@ function renderOverview(main,fs,fe,rev,exp,net){
   const cw=el('div','chart-wrap');const cv=document.createElement('canvas');cv.id='sChart';cw.appendChild(cv);cc.appendChild(cw);main.appendChild(cc);
   const two=el('div','two-col');
   const pm=el('div','card');pm.innerHTML='<div class="card-hd">Payment methods</div>';
-  ['Cash','Card','GCash'].forEach(function(m){
+  ['Cash','Card','GCash','Utang'].forEach(function(m){
     const a=fs.filter(function(s){return s.method===m;}).reduce(function(a,s){return a+s.total;},0);
     const cnt=fs.filter(function(s){return s.method===m;}).length;
     const pct=rev>0?Math.round(a/rev*100):0;
@@ -794,7 +794,7 @@ function renderSales(main,fs,rev){
   fs.slice(0,100).forEach(function(s){
     const tr=document.createElement('tr');
     const items=(s.items||[]).map(function(i){return i.name+(i.qty>1?' x'+i.qty:'');}).join(', ').slice(0,40);
-    const mcls={Cash:'b-green',Card:'b-blue',GCash:'b-purple'}[s.method]||'b-gray';
+    const mcls={Cash:'b-green',Card:'b-blue',GCash:'b-purple',Utang:'b-amber'}[s.method]||'b-gray';
     tr.innerHTML='<td style="font-family:monospace;font-size:11px">'+s.txn_id+'</td><td>'+items+'</td><td style="white-space:nowrap;font-size:12px">'+fd(s.date)+'</td><td style="font-size:12px;color:var(--t3)">'+s.cashier+'</td><td><span class="badge '+mcls+'">'+s.method+'</span></td><td style="text-align:right;font-weight:700">'+fmt(s.total)+'</td>';
     tb.appendChild(tr);
   });
@@ -1611,7 +1611,7 @@ function renderModal(root){
     const it=m.item||{};const isNew=!m.item;
     box.appendChild(el('div','modal-title',isNew?'Add employee':'Edit employee'));
     mfField(box,'eName','Full name','text',it.name,'Employee name');
-    mfField(box,'eRole','Role','text',it.role||'Staff','e.g. Cashier');
+    mfField(box,'eRole','Role','select',it.role||'Staff','',[ {v:'Staff',l:'Staff'},{v:'Cashier',l:'Cashier'},{v:'Manager',l:'Manager'},{v:'Supervisor',l:'Supervisor'},{v:'Cook',l:'Cook'},{v:'Driver',l:'Driver'}]);
     mfField(box,'ePhone','Phone','text',it.phone,'');
     mfField(box,'ePayType','Pay type','select',it.pay_type||'daily','',[ {v:'hourly',l:'Hourly rate'},{v:'daily',l:'Daily rate'},{v:'monthly',l:'Monthly salary'},{v:'commission',l:'Commission (% of sales)'}]);
     mfField(box,'eRate','Rate (PHP or % for commission)','number',it.pay_type==='commission'?it.commission_pct:it.rate,'0');
@@ -1689,12 +1689,23 @@ function renderModal(root){
       return true;
     });
     const hrs=eAtt.reduce(function(a,r){return a+r.hours_worked;},0);
-    const days=eAtt.length;
+    const days=new Set(eAtt.map(function(r){return r.date;})).size;
     let pay=0;
     if(e.pay_type==='hourly')pay=hrs*e.rate;
     else if(e.pay_type==='daily')pay=days*e.rate;
     else if(e.pay_type==='monthly')pay=e.rate;
-    else{const er=D.sales.filter(function(s){return!s.voided&&s.cashier===e.name;}).reduce(function(a,s){return a+s.total;},0);pay=er*(e.commission_pct/100);}
+    else{
+      const now2=new Date();
+      const er=D.sales.filter(function(s){
+        if(!s||s.voided||s.cashier!==e.name)return false;
+        const d=new Date(s.date);
+        if(UI.filter==='today')return d.toDateString()===now2.toDateString();
+        if(UI.filter==='week'){const w=new Date(now2);w.setDate(w.getDate()-7);return d>=w;}
+        if(UI.filter==='month'){const m2=new Date(now2);m2.setDate(m2.getDate()-30);return d>=m2;}
+        return true;
+      }).reduce(function(a,s){return a+s.total;},0);
+      pay=er*(e.commission_pct/100);
+    }
     const activeLoan=D.loans.filter(function(l){return l.status==='active'&&l.employee_id===e.id;}).reduce(function(a,l){return a+l.balance;},0);
     const deduction=Math.min(activeLoan,pay*0.2);
     const rows=[['Employee',e.name],['Role',e.role],['Pay type',e.pay_type.toUpperCase()],['Period',UI.filter],['Days worked',days],['Hours worked',hrs.toFixed(1)+'h'],['Rate',e.pay_type==='commission'?e.commission_pct+'%':fmt(e.rate)+'/'+e.pay_type],['Gross pay',fmt(pay)],['Loan deduction',deduction>0?'- '+fmt(deduction):'None'],['NET PAY',fmt(pay-deduction)]];
