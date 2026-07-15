@@ -395,6 +395,7 @@ const CR={name:'Reymar Arroyo',phone:'+639063964052',email:'areymar36@gmail.com'
 const GITHUB_PAGES_URL='https://interptools.github.io/arroyo-pos';
 const VERSION_URL=GITHUB_PAGES_URL+'/version.json';
 const UPDATE_URL=GITHUB_PAGES_URL+'/index.html';
+const DASH_UPDATE_URL=GITHUB_PAGES_URL+'/dashboard.html';
 
 const SUPA_URL='https://btfazallxcbmiitbcmkv.supabase.co';
 const SUPA_KEY='eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImJ0ZmF6YWxseGNibWlpdGJjbWt2Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODM5NjkwODIsImV4cCI6MjA5OTU0NTA4Mn0.Iu0qjlPttxxqY_LcvTND9Uir3uy71FCv469NjlfiIBE';
@@ -658,23 +659,34 @@ async function checkForUpdate(){
 async function applyUpdate(){
   try{
     toast('Downloading update...');
-    const r=await fetch(UPDATE_URL+'?t='+Date.now());
-    if(!r.ok){toast('Download failed. Try again.');return false;}
-    const html=await r.text();
-    // Save new version to localStorage so it loads next time
-    localStorage.setItem('arroyo_pos_update',html);
+    const [posRes,dashRes]=await Promise.all([
+      fetch(UPDATE_URL+'?t='+Date.now()),
+      fetch(DASH_UPDATE_URL+'?t='+Date.now()),
+    ]);
+    if(!posRes.ok||!dashRes.ok){toast('Download failed. Try again.');return false;}
+    const [posHtml,dashHtml]=await Promise.all([posRes.text(),dashRes.text()]);
+    localStorage.setItem('arroyo_pos_update',posHtml);
+    localStorage.setItem('arroyo_dash_update',dashHtml);
     toast('Update downloaded! Reloading...');
     setTimeout(function(){
-      // Write new content and reload
-      const blob=new Blob([html],{type:'text/html'});
-      const url=URL.createObjectURL(blob);
-      window.location.href=url;
+      const pending=localStorage.getItem('arroyo_pos_update');
+      if(pending){
+        localStorage.removeItem('arroyo_pos_update');
+        document.open('text/html');document.write(pending);document.close();
+      } else {
+        window.location.reload();
+      }
     },1200);
     return true;
   }catch(e){toast('Update failed: '+e.message);return false;}
 }
 
 function load(){
+  // Apply any pending update downloaded by applyUpdate()
+  try{
+    const pending=localStorage.getItem('arroyo_pos_update');
+    if(pending){localStorage.removeItem('arroyo_pos_update');document.open('text/html');document.write(pending);document.close();return;}
+  }catch(e){}
   try{
     const d=JSON.parse(localStorage.getItem('arroyo_pos')||'{}');
     if(d.installed)S.installed=true;
