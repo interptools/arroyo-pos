@@ -284,7 +284,8 @@ async function api(path,opts){
       console.error('API error',r.status,errText);
       return null;
     }
-    const t=await r.text();return t?JSON.parse(t):null;
+    if(r.status===204||r.status===205){return true;}
+    const t=await r.text();return t?JSON.parse(t):true;
   }catch(e){console.error('API fetch error',e);return null;}
 }
 async function signIn(email,pw){
@@ -497,13 +498,17 @@ function renderApp(root){
   sb.appendChild(brand);
   const nav=el('div','nav');
   function navSection(lbl){nav.appendChild(el('div','nav-section',lbl));}
+  const AUTO_REFRESH_PAGES=['inventory','recipes','ingredients'];
   function navItem(id,icon,lbl){
     const it=el('button','nav-item'+(UI.page===id?' active':''),'<i class="ti '+icon+'"></i>'+lbl);
     it.onclick=function(){UI.page=id;destroyCharts();
       // Close sidebar on mobile after tap
       const sb2=document.querySelector('.sidebar');const ov2=document.querySelector('.sidebar-overlay');
       if(sb2)sb2.classList.remove('open');if(ov2)ov2.classList.remove('open');
-      render();};nav.appendChild(it);
+      render();
+      // Auto-refresh product/ingredient data when navigating to these pages
+      if(AUTO_REFRESH_PAGES.indexOf(id)!==-1){loadData();}
+    };nav.appendChild(it);
   }
   navSection('Main');
   navItem('overview','ti-home','Overview');
@@ -749,7 +754,11 @@ function renderSales(main,fs,rev){
 }
 
 function renderInventory(main){
-  main.appendChild(el('div','page-title','Inventory'));
+  const hRow=el('div','');hRow.style.cssText='display:flex;align-items:center;justify-content:space-between;margin-bottom:18px;flex-wrap:wrap;gap:8px';
+  hRow.appendChild(el('div','page-title','Inventory'));
+  const syncInvBtn=el('button','add-btn','⟳ Sync from POS');
+  syncInvBtn.onclick=async function(){syncInvBtn.textContent='Syncing...';syncInvBtn.disabled=true;await loadData();syncInvBtn.textContent='⟳ Sync from POS';syncInvBtn.disabled=false;};
+  hRow.appendChild(syncInvBtn);main.appendChild(hRow);
   const low=D.products.filter(function(p){return p.stock!==999&&p.stock>0&&p.stock<=5;}).length;
   const out=D.products.filter(function(p){return p.stock!==999&&p.stock<=0;}).length;
   const sg=el('div','stats-grid');
@@ -758,7 +767,7 @@ function renderInventory(main){
   sg.appendChild(statCard('Out of stock',out,'','red'));
   main.appendChild(sg);
   const c=el('div','card');c.innerHTML='<div class="card-hd">All products</div>';
-  if(!D.products.length){c.appendChild(el('div','empty','No products'));main.appendChild(c);return;}
+  if(!D.products.length){const em=el('div','empty','No products yet — add products in the POS app, then tap ⟳ Sync from POS above.<br><br><strong>POS → Admin → Sync now</strong> pushes your products here.');em.style.lineHeight='1.7';c.appendChild(em);main.appendChild(c);return;}
   D.products.sort(function(a,b){return a.stock-b.stock;}).forEach(function(p){
     const isOut=p.stock!==999&&p.stock<=0;const isLow=p.stock!==999&&p.stock>0&&p.stock<=5;
     const r=el('div','row');
@@ -1156,7 +1165,11 @@ function renderSuppliers(main){
 }
 
 function renderRecipes(main){
-  main.appendChild(el('div','page-title','Recipes'));
+  const hRow2=el('div','');hRow2.style.cssText='display:flex;align-items:center;justify-content:space-between;margin-bottom:18px;flex-wrap:wrap;gap:8px';
+  hRow2.appendChild(el('div','page-title','Recipes'));
+  const syncRecBtn=el('button','add-btn','⟳ Sync from POS');
+  syncRecBtn.onclick=async function(){syncRecBtn.textContent='Syncing...';syncRecBtn.disabled=true;await loadData();syncRecBtn.textContent='⟳ Sync from POS';syncRecBtn.disabled=false;};
+  hRow2.appendChild(syncRecBtn);main.appendChild(hRow2);
   const prodWithRecipe=new Set(D.recipes.map(function(r){return r.product_name;})).size;
 
   // Calculate servings remaining per product (limited by the most constraining ingredient)
@@ -1535,8 +1548,10 @@ function renderModal(root){
   function close(){UI.modal=null;render();}
   function save(table,payload,id){
     const doSave=async function(){
-      if(id){await api('/rest/v1/'+table+'?id=eq.'+id,{method:'PATCH',body:JSON.stringify(payload)});}
-      else{await api('/rest/v1/'+table,{method:'POST',headers:{'Prefer':'return=representation'},body:JSON.stringify(payload)});}
+      const r=id
+        ?await api('/rest/v1/'+table+'?id=eq.'+id,{method:'PATCH',headers:{'Prefer':'return=representation'},body:JSON.stringify(payload)})
+        :await api('/rest/v1/'+table,{method:'POST',headers:{'Prefer':'return=representation'},body:JSON.stringify(payload)});
+      if(r===null){alert('Save failed. Check your connection.');return;}
       UI.modal=null;
       await loadData();
     };
@@ -1759,7 +1774,7 @@ function renderModal(root){
       if(isNew){
         await api('/rest/v1/recipes',{method:'POST',headers:{'Prefer':'return=representation'},body:JSON.stringify({biz_id:SESSION.bizId,product_name:p.name,ingredient_id:ingId,ingredient_name:ingName,qty_used:qty})});
       } else {
-        await api('/rest/v1/recipes?id=eq.'+r.id,{method:'PATCH',body:JSON.stringify({ingredient_id:ingId,ingredient_name:ingName,qty_used:qty})});
+        await api('/rest/v1/recipes?id=eq.'+r.id,{method:'PATCH',headers:{'Prefer':'return=representation'},body:JSON.stringify({ingredient_id:ingId,ingredient_name:ingName,qty_used:qty})});
       }
       UI.modal=null;await loadData();
     },isNew?'Add':'Save');
@@ -1838,9 +1853,9 @@ function renderModal(root){
       const endpoint=it.id?'/rest/v1/ingredients?id=eq.'+it.id:'/rest/v1/ingredients';
       const method=it.id?'PATCH':'POST';
       const result=await api(endpoint,{method,headers:{'Prefer':'return=representation'},body:JSON.stringify(p)});
-      if(result===null){alert('Save failed. Check your connection and try again.');}
+      if(result===null){alert('Save failed. Check your connection and try again.');return;}
       UI.modal=null;await loadData();
-    },isNew?'Add':'Save',it.id?function(){if(confirm('Delete '+it.name+'?'))api('/rest/v1/ingredients?id=eq.'+it.id,{method:'DELETE'}).then(loadData);close();}:null);
+    },isNew?'Add':'Save',it.id?async function(){if(confirm('Delete '+it.name+'?')){await api('/rest/v1/ingredients?id=eq.'+it.id,{method:'DELETE'});UI.modal=null;await loadData();}else{close();}}:null);
 
   } else if(m.type==='wastage'){
     box.appendChild(el('div','modal-title','Log wastage'));
