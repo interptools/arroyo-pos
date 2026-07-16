@@ -2678,7 +2678,7 @@ function renderModal(app){
       const nm=document.getElementById('eNm').value.trim(),am=parseFloat(document.getElementById('eAm').value)||0,cat=document.getElementById('eCat').value;
       if(!nm){toast('Enter a description');return;}if(am<=0){toast('Enter a valid amount');return;}
       S.expenses.push({id:S.expenseNid++,name:nm,amount:am,cat,date:new Date().toISOString()});
-      save();closeModal();toast('Expense added');
+      save();syncExpenseToCloud(S.expenses[S.expenses.length-1]);closeModal();toast('Expense added');
     };
     btns.appendChild(cancel);btns.appendChild(save2);body.appendChild(btns);
 
