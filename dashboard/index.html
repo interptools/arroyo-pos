@@ -301,6 +301,7 @@ function saveSession(){localStorage.setItem('apos_dash',JSON.stringify(SESSION))
 function loadSession(){try{const s=JSON.parse(localStorage.getItem('apos_dash')||'{}');if(s.token){SESSION=s;if(!SESSION.settings)SESSION.settings={};return true;}}catch(e){}return false;}
 
 let _loadDataBusy=false;
+let _loadDataTimer=null;
 async function loadData(){
   if(!SESSION.token){
     console.warn('[ArroyoDash] loadData skipped - no token');
@@ -308,6 +309,11 @@ async function loadData(){
   }
   if(_loadDataBusy){
     console.warn('[ArroyoDash] loadData already running — skipping duplicate call');
+    return;
+  }
+  // Debounce: if called again within 800ms of completing, skip
+  if(_loadDataTimer){
+    console.warn('[ArroyoDash] loadData debounced — too soon after last run');
     return;
   }
   _loadDataBusy=true;
@@ -339,6 +345,7 @@ async function loadData(){
   if(!SESSION.bizId){
     console.warn('[ArroyoDash] loadData skipped - no bizId after correction');
     _loadDataBusy=false;
+    _loadDataTimer=setTimeout(function(){_loadDataTimer=null;},800);
     return;
   }
   UI.loading=true;render();
@@ -367,6 +374,7 @@ async function loadData(){
   UI.loading=false;
   await loadSettingsFromCloud();
   _loadDataBusy=false;
+  _loadDataTimer=setTimeout(function(){_loadDataTimer=null;},800);
   render();
 }
 
