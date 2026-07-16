@@ -545,6 +545,11 @@ async function loadCloudData(silent){
 }
 async function saveProductsToCloud(){
   if(!CLOUD.token||!CLOUD.bizId)return false;
+  // Safety: never wipe cloud products if local is empty — pull instead
+  if(S.prods.length===0){
+    await loadCloudData(true);
+    return true;
+  }
   try{
     const ch=cloudHeaders();
     const delRes=await fetch(SUPA_URL+'/rest/v1/products?biz_id=eq.'+CLOUD.bizId,{method:'DELETE',headers:ch});
@@ -1094,8 +1099,12 @@ function renderWizard(app){
         }catch(e){console.error('Wizard biz sync error:',e);}
       }
       S.screen='pos';save();render();toast('Welcome to '+S.bizName+'! 🎉');
-      // Push sample products to cloud now that bizId is set
-      await saveProductsToCloud();
+      // Sync products: push only if we have local products, otherwise pull from cloud
+      if(S.prods.length>0){
+        await saveProductsToCloud();
+      } else {
+        await loadCloudData(true);
+      }
     }
   };
   foot.appendChild(next);
@@ -1904,9 +1913,9 @@ function renderAdmin(scr){
       syncBtn.textContent='Sync now';syncBtn.style.opacity='1';return;
     }
     // Push products
-    logSync('Pushing '+S.prods.length+' products...');
+    logSync(S.prods.length>0?'Pushing '+S.prods.length+' products...':'No local products — pulling from cloud...');
     const prodOk=await saveProductsToCloud();
-    logSync(prodOk?'Products pushed OK':'Products push FAILED — check console for details',prodOk);
+    logSync(prodOk?'Products synced OK':'Products sync FAILED — check console for details',prodOk);
     if(!prodOk){toast('Sync failed — products not saved.');syncBtn.textContent='Sync now';syncBtn.style.opacity='1';return;}
     // Push settings
     logSync('Pushing settings...');
