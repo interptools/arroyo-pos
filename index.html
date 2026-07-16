@@ -1047,6 +1047,255 @@ function receiptStr(method,id,refNum){
   return rows.join('\n');
 }
 
+// ── CODE 128 BARCODE GENERATOR ──────────────────────────────
+// Generates a pure SVG Code 128B barcode — no external library needed
+function code128SVG(text,opts){
+  opts=opts||{};
+  const height=opts.height||60;
+  const quiet=opts.quiet||10;
+
+  // Code 128B encoding table (value → bar pattern)
+  const C128={
+    ' ':11011001100,'!':11001101100,'"':11001100110,'#':10010011000,
+    '$':10010001100,'%':10001001100,'&':10011001000,"'":10011000100,
+    '(':10001100100,')':11001001000,'*':11001000100,'+':11000100100,
+    ',':10110011100,'-':10011011100,'.':10011001110,'/':10111001100,
+    '0':10011101100,'1':10011100110,'2':11001110010,'3':11001011100,
+    '4':11001001110,'5':11011100100,'6':11001110100,'7':11101101110,
+    '8':11101001100,'9':11100101100,':':11100100110,';':11101100100,
+    '<':11100110100,'=':11100110010,'>':11011011000,'?':11011000110,
+    '@':11000110110,'A':10100011000,'B':10001011000,'C':10001000110,
+    'D':10110001000,'E':10001101000,'F':10001100010,'G':11010001000,
+    'H':11000101000,'I':11000100010,'J':10110111000,'K':10110001110,
+    'L':10001101110,'M':10111011000,'N':10111000110,'O':10001110110,
+    'P':11101110110,'Q':11010001110,'R':11000010010,'S':11001010000,
+    'T':11110101000,'U':11110100010,'V':11110010010,'W':11011110100,
+    'X':11011110010,'Y':11110110100,'Z':11010111000,
+    '[':11010100010,'\\':11010010000,']':11011010000,'^':11011001010,
+    '_':10000110100,'`':10000110010,'a':10011010000,'b':10011001010,
+    'c':10000101100,'d':10000100110,'e':10110010000,'f':10110000100,
+    'g':10011000010,'h':10000011010,'i':10000010110,'j':10110100000,
+    'k':10110010100,'l':10110000010,'m':11000010100,'n':11001010100,
+    'o':10111100010,'p':11001001010,'q':10010011110,'r':10011110010,
+    's':10011110100,'t':10111001110,'u':10111100100,'v':10001111010,
+    'w':10011011110,'x':10001111100,'y':10111011110,'z':10111101110,
+    '{':11110010100,'|':11110010010,'}':11011110100,'~':11011101000
+  };
+
+  // Start Code B = pattern 11010010000, value=104
+  const START_B=11010010000;
+  const STOP=11000111010;
+  const startVal=104;
+
+  // Build bar pattern string
+  let patterns=[START_B.toString()];
+  let checksum=startVal;
+  const chars=[...text];
+  chars.forEach(function(ch,i){
+    const pat=C128[ch];
+    if(!pat)return;
+    patterns.push(pat.toString());
+    // checksum: startVal + sum(charVal * position)
+    // Code128B: space=0, !..~ = 1..94
+    const v=ch.charCodeAt(0)-32; // space=0, A=33, etc.
+    checksum+=v*(i+1);
+  });
+
+  // Check character (value mod 103)
+  const checkVal=checksum%103;
+  // Find the character for checkVal in Code128B
+  // checkVal maps to ASCII: checkVal+32 for B set
+  const checkChar=String.fromCharCode(checkVal+32);
+  const checkPat=C128[checkChar];
+  if(checkPat)patterns.push(checkPat.toString());
+
+  patterns.push(STOP.toString());
+
+  // Convert patterns to bar widths
+  // Each digit in pattern = 1 unit wide bar or space
+  // 1=bar, 0=space (alternating, starting with bar)
+  let bars=[];
+  patterns.forEach(function(p){
+    const digits=p.split('');
+    digits.forEach(function(d){bars.push(parseInt(d));});
+  });
+
+  // Build SVG
+  const unitW=opts.unitW||2; // px per unit — 2px good for thermal
+  let x=quiet;
+  let rects='';
+  let isBar=true;
+  bars.forEach(function(w){
+    if(isBar&&w>0){
+      rects+='<rect x="'+x+'" y="0" width="'+(w*unitW)+'" height="'+height+'" fill="#000"/>';
+    }
+    x+=w*unitW;
+    isBar=!isBar;
+  });
+  const totalW=x+quiet;
+
+  return '<svg xmlns="http://www.w3.org/2000/svg" width="'+totalW+'" height="'+(height+20)+'" viewBox="0 0 '+totalW+' '+(height+20)+'">'
+    +'<rect width="'+totalW+'" height="'+(height+20)+'" fill="#fff"/>'
+    +rects
+    +'<text x="'+(totalW/2)+'" y="'+(height+14)+'" text-anchor="middle" font-family="monospace" font-size="9" fill="#000">'+text+'</text>'
+    +'</svg>';
+}
+
+// ── PRINT RECEIPT WINDOW ─────────────────────────────────────
+function printReceipt(tx){
+  // Build thermal-friendly HTML receipt
+  const isWide=S.thermalWidth==='80'||false; // default 58mm
+  const mmW=isWide?80:58;
+  const pxW=isWide?302:219; // 80mm≈302px, 58mm≈219px at 96dpi
+
+  // Generate barcode SVG for the TXN ID
+  const barSVG=code128SVG(tx.id,{height:50,unitW:isWide?2:1.5,quiet:6});
+
+  // Build items rows
+  let itemsHtml='';
+  (tx.items||[]).forEach(function(it){
+    const sub=(it.price*it.qty).toFixed(2);
+    const name=it.name+(it.variantLabel?' ('+it.variantLabel+')':'');
+    itemsHtml+='<tr>'
+      +'<td style="text-align:left">'+name+'</td>'
+      +'<td style="text-align:center">x'+it.qty+'</td>'
+      +'<td style="text-align:right">'+it.price.toFixed(2)+'</td>'
+      +'<td style="text-align:right">'+sub+'</td>'
+      +'</tr>';
+  });
+
+  // Subtotal, discount, total
+  const subtotal=tx.items.reduce(function(a,i){return a+(i.price*i.qty);},0);
+  const discAmt=subtotal-tx.total;
+  let totalsHtml='<tr><td colspan="3" style="text-align:right">Subtotal</td><td style="text-align:right">'+subtotal.toFixed(2)+'</td></tr>';
+  if(discAmt>0.01){
+    totalsHtml+='<tr><td colspan="3" style="text-align:right">Discount</td><td style="text-align:right">-'+discAmt.toFixed(2)+'</td></tr>';
+  }
+  totalsHtml+='<tr style="font-weight:700;border-top:1px solid #000"><td colspan="3" style="text-align:right">TOTAL</td><td style="text-align:right">'+tx.total.toFixed(2)+'</td></tr>';
+
+  // Cash change row
+  let cashHtml='';
+  if(tx.method==='Cash'&&S.cashTendered>0){
+    const change=S.cashTendered-tx.total;
+    cashHtml='<tr><td colspan="3" style="text-align:right">Cash</td><td style="text-align:right">'+S.cashTendered.toFixed(2)+'</td></tr>'
+      +'<tr><td colspan="3" style="text-align:right">Change</td><td style="text-align:right">'+Math.max(0,change).toFixed(2)+'</td></tr>';
+  }
+
+  // Ref number
+  const refHtml=tx.ref?'<div style="font-size:10px;margin:2px 0">Ref: '+tx.ref+'</div>':'';
+
+  // Cashier
+  const cashierHtml=tx.cashier?'<div style="font-size:10px;margin:2px 0">Cashier: '+tx.cashier+'</div>':'';
+
+  const now=new Date(tx.date);
+  const dateStr=now.toLocaleDateString('en-PH',{year:'numeric',month:'short',day:'numeric'});
+  const timeStr=now.toLocaleTimeString([],{hour:'2-digit',minute:'2-digit'});
+
+  // Logo placeholder or biz initials
+  const bizInitials=(S.bizName||'AP').slice(0,2).toUpperCase();
+
+  const html='<!DOCTYPE html><html><head>'
+    +'<meta charset="UTF-8">'
+    +'<title>Receipt - '+tx.id+'</title>'
+    +'<style>'
+    +'*{margin:0;padding:0;box-sizing:border-box}'
+    +'body{'
+    +'  font-family:"Courier New",Courier,monospace;'
+    +'  font-size:12px;'
+    +'  width:'+pxW+'px;'
+    +'  margin:0 auto;'
+    +'  padding:8px 6px;'
+    +'  color:#000;'
+    +'  background:#fff;'
+    +'}'
+    +'.center{text-align:center}'
+    +'.divider{border-top:1px dashed #000;margin:6px 0}'
+    +'.divider-solid{border-top:1px solid #000;margin:6px 0}'
+    +'table{width:100%;border-collapse:collapse;font-size:11px}'
+    +'td{padding:2px 1px;vertical-align:top}'
+    +'.biz-name{font-size:15px;font-weight:700;letter-spacing:1px}'
+    +'.txn-id{font-size:10px;color:#333;margin:3px 0}'
+    +'.method-badge{'
+    +'  display:inline-block;border:1px solid #000;'
+    +'  padding:1px 6px;font-size:10px;font-weight:700;'
+    +'  border-radius:3px;margin:3px 0'
+    +'}'
+    +'.barcode-wrap{margin:6px auto;text-align:center}'
+    +'.footer{font-size:9px;color:#555;margin-top:4px}'
+    +'@media print{'
+    +'  @page{margin:0;size:'+mmW+'mm auto}'
+    +'  body{width:100%;padding:4px}'
+    +'  .no-print{display:none}'
+    +'}'
+    +'</style></head><body>'
+
+    // Header
+    +'<div class="center">'
+    +(S.bizLogo
+      ?'<img src="'+S.bizLogo+'" style="width:48px;height:48px;border-radius:8px;object-fit:cover;margin-bottom:4px"><br>'
+      :'<div style="font-size:20px;font-weight:800;border:2px solid #000;display:inline-block;padding:4px 10px;border-radius:6px;margin-bottom:4px">'+bizInitials+'</div><br>'
+    )
+    +'<div class="biz-name">'+S.bizName+'</div>'
+    +'</div>'
+
+    +'<div class="divider-solid"></div>'
+
+    // Date, time, TXN
+    +'<div style="font-size:10px;display:flex;justify-content:space-between">'
+    +'<span>'+dateStr+'</span>'
+    +'<span>'+timeStr+'</span>'
+    +'</div>'
+    +'<div class="txn-id center">'+tx.id+'</div>'
+    +cashierHtml
+    +refHtml
+    +'<div class="center"><span class="method-badge">'+tx.method.toUpperCase()+'</span></div>'
+
+    +'<div class="divider"></div>'
+
+    // Items table header
+    +'<table>'
+    +'<tr style="border-bottom:1px solid #000;font-weight:700">'
+    +'<td>Item</td><td style="text-align:center">Qty</td>'
+    +'<td style="text-align:right">Price</td><td style="text-align:right">Amt</td>'
+    +'</tr>'
+    +itemsHtml
+    +'<tr><td colspan="4"><div class="divider"></div></td></tr>'
+    +totalsHtml
+    +cashHtml
+    +'</table>'
+
+    +'<div class="divider-solid"></div>'
+
+    // Barcode
+    +'<div class="barcode-wrap">'+barSVG+'</div>'
+
+    +'<div class="divider"></div>'
+
+    // Footer
+    +'<div class="center footer">'
+    +'<div>Thank you for your purchase!</div>'
+    +'<div style="margin-top:2px">Powered by Arroyo POS</div>'
+    +'</div>'
+
+    // Print button (hidden when printing)
+    +'<div class="no-print" style="text-align:center;margin-top:12px">'
+    +'<button onclick="window.print()" style="padding:10px 28px;font-size:14px;font-weight:700;cursor:pointer;border:2px solid #000;background:#000;color:#fff;border-radius:6px">🖨 Print</button>'
+    +'<button onclick="window.close()" style="padding:10px 18px;font-size:14px;cursor:pointer;border:1px solid #ccc;background:#fff;color:#333;border-radius:6px;margin-left:8px">Close</button>'
+    +'</div>'
+
+    +'</body></html>';
+
+  const win=window.open('','_blank','width='+Math.min(pxW+60,400)+',height=640,scrollbars=yes');
+  if(win){
+    win.document.write(html);
+    win.document.close();
+    // Auto-trigger print dialog after render
+    win.onload=function(){win.focus();win.print();};
+  } else {
+    toast('Allow popups to print receipt');
+  }
+}
+
 function openModal(m){S.modal=m;render();}
 function closeModal(){S.modal=null;render();}
 
@@ -2647,7 +2896,9 @@ function renderModal(app){
         S.sales.push(tx);S.salesTotal+=tot();S.cart=[];S.disc=0;S.cashTendered=0;S.cartOpen=false;
         S.selectedCustomer=null;S.chargeToUtang=false;
         save();syncSaleToCloud(tx);recordCustomerSale(tx);deductIngredients(cartCopy);
-        closeModal();toast('Sale recorded - '+txid);
+        closeModal();
+        toast('Sale recorded - '+txid);
+        openModal({type:'receiptReady',tx:tx,cashTendered:S.cashTendered});
       };
 
     } else {
@@ -2694,10 +2945,69 @@ function renderModal(app){
         S.sales.push(tx);S.salesTotal+=tot();S.cart=[];S.disc=0;S.cashTendered=0;S.cartOpen=false;
         S.selectedCustomer=null;S.chargeToUtang=false;
         save();syncSaleToCloud(tx);recordCustomerSale(tx);deductIngredients(cartCopy2);
-        closeModal();toast('Sale recorded - '+txid);
+        closeModal();
+        toast('Sale recorded - '+txid);
+        openModal({type:'receiptReady',tx:tx,cashTendered:0});
       };
       btns.appendChild(cancelBtn);btns.appendChild(confirmBtn);body.appendChild(btns);
     }
+
+  } else if(m.type==='receiptReady'){
+    // ── POST-SALE RECEIPT MODAL ──
+    const tx=m.tx;
+    const cashTendered=m.cashTendered||0;
+    const change=cashTendered>0?Math.max(0,cashTendered-tx.total):0;
+
+    // Big success checkmark
+    const success=document.createElement('div');
+    success.style.cssText='text-align:center;padding:10px 0 4px';
+    success.innerHTML='<div style="font-size:48px">✓</div>'
+      +'<div style="font-size:18px;font-weight:800;color:var(--st);margin-top:4px">Sale Recorded!</div>'
+      +'<div style="font-size:12px;color:var(--t3);margin-top:4px">'+tx.id+'</div>';
+    body.appendChild(success);
+
+    // Change amount (cash only)
+    if(cashTendered>0){
+      const chBox=document.createElement('div');
+      chBox.style.cssText='background:var(--sg);border:1.5px solid var(--st);border-radius:12px;padding:14px;text-align:center;margin:8px 0';
+      chBox.innerHTML='<div style="font-size:11px;font-weight:700;color:var(--st);text-transform:uppercase;letter-spacing:.5px">Change Due</div>'
+        +'<div style="font-size:28px;font-weight:800;color:var(--st)">PHP '+change.toFixed(2)+'</div>';
+      body.appendChild(chBox);
+    }
+
+    // Summary row
+    const sumRow=document.createElement('div');
+    sumRow.style.cssText='background:var(--bg2);border-radius:10px;padding:12px 14px;display:flex;justify-content:space-between;align-items:center;margin:6px 0';
+    sumRow.innerHTML='<div>'
+      +'<div style="font-size:13px;font-weight:600">'+tx.items.map(i=>i.name+' x'+i.qty).join(', ')+'</div>'
+      +'<div style="font-size:11px;color:var(--t3);margin-top:2px">'+tx.method+(tx.cashier?' · '+tx.cashier:'')+'</div>'
+      +'</div>'
+      +'<div style="font-size:18px;font-weight:800;color:var(--ac);flex-shrink:0;margin-left:12px">PHP '+tx.total.toFixed(2)+'</div>';
+    body.appendChild(sumRow);
+
+    // Action buttons
+    const btns=document.createElement('div');
+    btns.style.cssText='display:flex;gap:8px;margin-top:8px';
+
+    const printBtn=document.createElement('button');
+    printBtn.className='mpri';
+    printBtn.style.cssText='flex:2;padding:14px;font-size:15px;font-weight:700;border-radius:12px;border:none;background:var(--ac);color:#fff;cursor:pointer;display:flex;align-items:center;justify-content:center;gap:8px';
+    printBtn.innerHTML='🖨️ Print Receipt';
+    printBtn.onclick=function(){
+      // Temporarily restore cashTendered for print
+      const prevCash=S.cashTendered;
+      S.cashTendered=cashTendered;
+      printReceipt(tx);
+      S.cashTendered=prevCash;
+    };
+
+    const doneBtn=document.createElement('button');
+    doneBtn.style.cssText='flex:1;padding:14px;font-size:14px;font-weight:600;border-radius:12px;border:1.5px solid var(--b2);background:var(--bg2);color:var(--t1);cursor:pointer';
+    doneBtn.textContent='Done';
+    doneBtn.onclick=closeModal;
+
+    btns.appendChild(printBtn);btns.appendChild(doneBtn);
+    body.appendChild(btns);
 
   } else if(m.type==='viewtx'){
     body.innerHTML='<div class="mtitle">'+m.tx.id+(m.tx.voided?'<span style="font-size:12px;color:var(--dt);margin-left:8px;font-weight:400">VOIDED</span>':'')+'</div>';
@@ -2719,6 +3029,12 @@ function renderModal(app){
       };
       b.appendChild(vb);
     }
+    // Print button in history
+    const printBtn2=document.createElement('button');printBtn2.className='mpri';
+    printBtn2.style.cssText='padding:10px 16px;font-size:13px;font-weight:700;display:flex;align-items:center;gap:6px';
+    printBtn2.innerHTML='🖨️ Print';
+    printBtn2.onclick=function(){printReceipt(m.tx);};
+    b.appendChild(printBtn2);
     const cb=document.createElement('button');cb.textContent='Close';cb.onclick=closeModal;b.appendChild(cb);body.appendChild(b);
 
   } else if(m.type==='itemNote'){
