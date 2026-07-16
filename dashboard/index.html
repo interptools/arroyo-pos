@@ -349,6 +349,7 @@ async function loadData(){
     return;
   }
   UI.loading=true;render();
+  updateSyncStatus('syncing');
   const bid=SESSION.bizId;
   console.log('[ArroyoDash] loadData started for bizId:',bid);
   const results=await Promise.all([
@@ -374,6 +375,7 @@ async function loadData(){
   UI.loading=false;
   await loadSettingsFromCloud();
   _loadDataBusy=false;
+  updateSyncStatus('idle','Synced '+new Date().toLocaleTimeString([],{hour:'2-digit',minute:'2-digit'}));
   render();
 }
 
@@ -622,10 +624,28 @@ function renderApp(root){
   navItem('customers','ti-heart','Customers');
   sb.appendChild(nav);
   const foot=el('div','sb-foot');
-  foot.innerHTML='<div class="user-email">'+SESSION.email+'</div><div style="font-size:10px;color:var(--t3);padding:2px 8px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="'+SESSION.bizId+'">biz: '+(SESSION.bizId?SESSION.bizId.slice(0,8)+'...':'⚠ none')+'</div>';
+  // Sync status row
+  const syncStatusRow=document.createElement('div');
+  syncStatusRow.style.cssText='display:flex;align-items:center;gap:6px;padding:4px 8px;margin-bottom:4px';
+  const sdot=document.createElement('div');sdot.id='dashSyncDot';
+  const offlineNow=!navigator.onLine;
+  sdot.style.cssText='width:7px;height:7px;border-radius:50%;flex-shrink:0;background:'+(offlineNow?'var(--wt)':'var(--st)');
+  const slbl=document.createElement('span');slbl.id='dashSyncLbl';
+  slbl.style.cssText='font-size:10px;color:var(--t3);font-weight:600';
+  slbl.textContent=offlineNow?'Offline':'Synced';
+  syncStatusRow.appendChild(sdot);syncStatusRow.appendChild(slbl);foot.appendChild(syncStatusRow);
+  foot.innerHTML+='<div class="user-email">'+SESSION.email+'</div><div style="font-size:10px;color:var(--t3);padding:2px 8px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="'+SESSION.bizId+'">biz: '+(SESSION.bizId?SESSION.bizId.slice(0,8)+'...':'⚠ none')+'</div>';
+  foot.insertBefore(syncStatusRow,foot.firstChild);
   const syncBtn=el('button','so-btn','<i class="ti ti-refresh" style="font-size:14px;vertical-align:-2px;margin-right:4px"></i>Sync data');
   syncBtn.onclick=async function(){
-    syncBtn.textContent='Finding data...';
+    syncBtn.textContent='Syncing...';updateSyncStatus('syncing');
+    // Ensure session is valid first — no logout needed
+    const authed=await ensureDashAuth();
+    if(!authed){
+      syncBtn.innerHTML='<i class="ti ti-refresh" style="font-size:14px;vertical-align:-2px;margin-right:4px"></i>Sync data';
+      updateSyncStatus('error','Session expired');
+      alert('Session expired. Please sign out and sign in again.');return;
+    }
     // Step 1: try to get bizId from POS localStorage (same browser)
     try{
       const posCloud=JSON.parse(localStorage.getItem('arroyo_cloud')||'{}');
@@ -644,6 +664,7 @@ function renderApp(root){
     }
     await loadData();
     syncBtn.innerHTML='<i class="ti ti-refresh" style="font-size:14px;vertical-align:-2px;margin-right:4px"></i>Sync data';
+    updateSyncStatus('idle','Synced');
   };
   foot.appendChild(syncBtn);
   const soBtn=el('button','so-btn','<i class="ti ti-logout" style="font-size:14px;vertical-align:-2px;margin-right:4px"></i>Sign out');
@@ -2007,6 +2028,111 @@ function exportCSV(sales){
   const a=document.createElement('a');a.href=URL.createObjectURL(new Blob([csv],{type:'text/csv'}));a.download='sales-'+new Date().toISOString().slice(0,10)+'.csv';a.click();
 }
 
+// ── DASHBOARD TOKEN REFRESH ──
+async function refreshDashSession(){
+  const stored=JSON.parse(localStorage.getItem('apos_dash')||'{}');
+  const refreshToken=stored.refresh||SESSION.refresh;
+  if(!refreshToken)return false;
+  try{
+    const r=await fetch(SB_URL+'/auth/v1/token?grant_type=refresh_token',{
+      method:'POST',
+      headers:{'apikey':SB_KEY,'Content-Type':'application/json'},
+      body:JSON.stringify({refresh_token:refreshToken})
+    });
+    const res=await r.json();
+    if(res.access_token){
+      SESSION.token=res.access_token;
+      if(res.refresh_token)SESSION.refresh=res.refresh_token;
+      saveSession();
+      console.log('[ArroyoDash] Token refreshed OK');
+      return true;
+    }
+    return false;
+  }catch(e){return false;}
+}
+
+async function ensureDashAuth(){
+  if(!SESSION.token)return false;
+  try{
+    const r=await fetch(SB_URL+'/auth/v1/user',{headers:{'apikey':SB_KEY,'Authorization':'Bearer '+SESSION.token}});
+    if(r.ok)return true;
+    if(r.status===401||r.status===403){
+      console.log('[ArroyoDash] Token expired — attempting refresh...');
+      return await refreshDashSession();
+    }
+  }catch(e){}
+  return true; // network error — let next call fail naturally
+}
+
+function scheduleDashTokenRefresh(){
+  if(!SESSION.token)return;
+  try{
+    const payload=JSON.parse(atob(SESSION.token.split('.')[1].replace(/-/g,'+').replace(/_/g,'/')));
+    if(!payload.exp)return;
+    const msUntilExpiry=(payload.exp*1000)-Date.now();
+    const refreshIn=Math.max(0,msUntilExpiry-5*60*1000);
+    console.log('[ArroyoDash] Token refresh in '+(refreshIn/1000/60).toFixed(1)+'m');
+    setTimeout(async function(){
+      if(!SESSION.token)return;
+      const ok=await refreshDashSession();
+      if(ok){scheduleDashTokenRefresh();}
+      else{console.warn('[ArroyoDash] Proactive refresh failed');}
+    },refreshIn);
+  }catch(e){}
+}
+
+// Override api() to auto-retry on 401 with token refresh
+const _origApi=api;
+async function api(path,opts){
+  const authToken=(SESSION&&SESSION.token)?SESSION.token:SB_KEY;
+  const h={'apikey':SB_KEY,'Authorization':'Bearer '+authToken,'Content-Type':'application/json',...(opts&&opts.headers||{})};
+  try{
+    const r=await fetch(SB_URL+path,{...opts,headers:h});
+    if(r.status===401||r.status===403){
+      // Try refresh once, then retry
+      const refreshed=await refreshDashSession();
+      if(refreshed){
+        const h2={'apikey':SB_KEY,'Authorization':'Bearer '+SESSION.token,'Content-Type':'application/json',...(opts&&opts.headers||{})};
+        const r2=await fetch(SB_URL+path,{...opts,headers:h2});
+        if(!r2.ok){console.error('API error after refresh',r2.status);return null;}
+        if(r2.status===204||r2.status===205)return true;
+        const t2=await r2.text();return t2?JSON.parse(t2):true;
+      }
+      console.error('API 401/403 and refresh failed for',path);return null;
+    }
+    if(!r.ok){const errText=await r.text();console.error('API error',r.status,errText);return null;}
+    if(r.status===204||r.status===205){return true;}
+    const t=await r.text();return t?JSON.parse(t):true;
+  }catch(e){console.error('API fetch error',e);return null;}
+}
+
+// ── DASHBOARD SYNC STATUS in sidebar ──
+let _dashSyncStatus='idle'; // 'idle' | 'syncing' | 'error' | 'offline'
+function updateSyncStatus(status,msg){
+  _dashSyncStatus=status;
+  const dot=document.getElementById('dashSyncDot');
+  const lbl=document.getElementById('dashSyncLbl');
+  if(!dot||!lbl)return;
+  const colors={idle:'var(--st)',syncing:'var(--ac)',error:'var(--dt)',offline:'var(--wt)'};
+  const labels={idle:msg||'Synced',syncing:'Syncing…',error:msg||'Sync error',offline:'Offline'};
+  dot.style.background=colors[status]||'var(--t3)';
+  lbl.textContent=labels[status]||msg||'';
+}
+
+// ── ONLINE / OFFLINE HANDLING (dashboard) ──
+window.addEventListener('offline',function(){
+  updateSyncStatus('offline');
+  console.log('[ArroyoDash] Went offline');
+});
+
+window.addEventListener('online',async function(){
+  console.log('[ArroyoDash] Back online — reloading data');
+  updateSyncStatus('syncing');
+  const authed=await ensureDashAuth();
+  if(authed){await loadData();}
+  else{updateSyncStatus('error','Session expired — please sign in again');}
+});
+
 // Apply any pending dashboard update downloaded by POS applyUpdate()
 try{
   const pending=localStorage.getItem('arroyo_dash_update');
@@ -2014,6 +2140,9 @@ try{
   else if(loadSession()){
   (async function(){
     try{
+      // Refresh token on every dashboard open — no logout needed
+      await ensureDashAuth();
+      scheduleDashTokenRefresh();
       const headers={'apikey':SB_KEY,'Authorization':'Bearer '+SESSION.token,'Content-Type':'application/json'};
       // STEP 1: Try to read the POS session from localStorage - this is the authoritative bizId
       let posBizId=null;
