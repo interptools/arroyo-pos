@@ -1732,8 +1732,8 @@ async function loadAttEmployees(){
     }catch(e){toast('Could not find business');return;}
   }
   try{
-    // Use anon key headers for reading employees (public business data)
-    const h2={...H};
+    // Use authenticated headers so RLS allows reading employees
+    const h2=cloudHeaders();
     const today=new Date().toISOString().slice(0,10);
     const empRes=await fetch(SUPA_URL+'/rest/v1/employees?biz_id=eq.'+CLOUD.bizId+'&active=eq.true&order=name',{headers:h2});
     const emps=await empRes.json();
