@@ -627,9 +627,17 @@ async function saveProductsToCloud(){
     await loadCloudData(true);
     return true;
   }
+  // Proactively refresh token before any write operation to avoid JWT expired mid-sync
+  if(CLOUD.refresh){await refreshSession();}
   try{
-    const ch=cloudHeaders();
-    const delRes=await fetch(SUPA_URL+'/rest/v1/products?biz_id=eq.'+CLOUD.bizId,{method:'DELETE',headers:ch});
+    let ch=cloudHeaders();
+    let delRes=await fetch(SUPA_URL+'/rest/v1/products?biz_id=eq.'+CLOUD.bizId,{method:'DELETE',headers:ch});
+    // If 401 JWT expired — refresh and retry once
+    if(!delRes.ok&&delRes.status===401&&CLOUD.refresh){
+      console.log('[Arroyo] Token expired on DELETE — refreshing and retrying...');
+      const refreshed=await refreshSession();
+      if(refreshed){ch=cloudHeaders();delRes=await fetch(SUPA_URL+'/rest/v1/products?biz_id=eq.'+CLOUD.bizId,{method:'DELETE',headers:ch});}
+    }
     if(!delRes.ok){console.error('saveProductsToCloud DELETE failed:',delRes.status,await delRes.text());return false;}
     if(S.prods.length>0){
       const rows=S.prods.map(p=>({biz_id:CLOUD.bizId,local_id:p.id,name:p.name,price:p.price,cat:p.cat,icon:p.icon,stock:p.stock,variants:p.variants||[],img:p.img||null,sale_pct:p.salePct||0}));
@@ -641,6 +649,7 @@ async function saveProductsToCloud(){
 }
 async function saveSettingsToCloud(){
   if(!CLOUD.token||!CLOUD.bizId)return false;
+  if(CLOUD.refresh){await refreshSession();}
   try{
     const ch=cloudHeaders();
     const settings={
