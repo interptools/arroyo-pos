@@ -461,6 +461,68 @@ let CLOUD={user:null,token:null,refresh:null,bizId:null};
 
 function cloudHeaders(){return{...H,'Authorization':'Bearer '+(CLOUD.token||SUPA_KEY)};}
 
+// Global 401 handler — auto-refresh token, then show inline re-auth if needed
+async function ensureAuth(){
+  if(!CLOUD.token)return false;
+  // Try a quick token check
+  try{
+    const r=await fetch(SUPA_URL+'/auth/v1/user',{headers:{'apikey':SUPA_KEY,'Authorization':'Bearer '+CLOUD.token}});
+    if(r.ok)return true;
+    if(r.status===401){
+      // Try refresh token first
+      if(CLOUD.refresh){
+        const ok=await refreshSession();
+        if(ok)return true;
+      }
+      // Refresh failed or no refresh token — show inline re-auth
+      return await showReAuthModal();
+    }
+  }catch(e){}
+  return true; // Network error — let the actual call fail with its own error
+}
+
+function showReAuthModal(){
+  return new Promise(function(resolve){
+    // Remove any existing re-auth modal
+    const existing=document.getElementById('reAuthOverlay');
+    if(existing)existing.remove();
+    const overlay=document.createElement('div');overlay.id='reAuthOverlay';
+    overlay.style.cssText='position:fixed;inset:0;background:rgba(0,0,0,0.7);z-index:9999;display:flex;align-items:center;justify-content:center;padding:20px';
+    const card=document.createElement('div');
+    card.style.cssText='background:var(--bg0);border:1px solid var(--b2);border-radius:16px;padding:24px;width:100%;max-width:340px;display:flex;flex-direction:column;gap:12px';
+    card.innerHTML='<div style="font-size:17px;font-weight:700;color:var(--t1)">Session expired</div>'
+      +'<div style="font-size:13px;color:var(--t2);line-height:1.6">Your session has expired. Enter your password to continue — no data will be lost.</div>'
+      +'<div style="font-size:12px;color:var(--t3)">'+(S.cloudEmail||'your account')+'</div>'
+      +'<input id="reAuthPw" type="password" placeholder="Password" style="width:100%;padding:10px 12px;border-radius:8px;border:1px solid var(--b2);background:var(--bg1);color:var(--t1);font-size:14px">'
+      +'<div id="reAuthErr" style="font-size:12px;color:var(--dt);min-height:16px"></div>';
+    const btnRow=document.createElement('div');btnRow.style.cssText='display:flex;gap:8px';
+    const cancelBtn=document.createElement('button');cancelBtn.textContent='Cancel';cancelBtn.className='abtn';
+    cancelBtn.style.cssText='flex:1;padding:10px';
+    cancelBtn.onclick=function(){overlay.remove();resolve(false);};
+    const okBtn=document.createElement('button');okBtn.textContent='Sign in';okBtn.className='abtn pri';
+    okBtn.style.cssText='flex:1;padding:10px;font-weight:700';
+    okBtn.onclick=async function(){
+      const pw=document.getElementById('reAuthPw').value;
+      if(!pw){document.getElementById('reAuthErr').textContent='Enter your password.';return;}
+      okBtn.textContent='Signing in...';okBtn.disabled=true;
+      const res=await signIn(S.cloudEmail,pw);
+      if(res.access_token){
+        CLOUD.token=res.access_token;
+        if(res.refresh_token)CLOUD.refresh=res.refresh_token;
+        localStorage.setItem('arroyo_cloud',JSON.stringify({user:CLOUD.user,token:CLOUD.token,refresh:CLOUD.refresh,bizId:CLOUD.bizId,email:S.cloudEmail,bizName:S.cloudBizName}));
+        overlay.remove();resolve(true);
+      } else {
+        document.getElementById('reAuthErr').textContent='Wrong password. Try again.';
+        okBtn.textContent='Sign in';okBtn.disabled=false;
+      }
+    };
+    card.querySelector('#reAuthPw').addEventListener('keydown',function(e){if(e.key==='Enter')okBtn.click();});
+    btnRow.appendChild(cancelBtn);btnRow.appendChild(okBtn);card.appendChild(btnRow);
+    overlay.appendChild(card);document.body.appendChild(overlay);
+    setTimeout(function(){const pw=document.getElementById('reAuthPw');if(pw)pw.focus();},100);
+  });
+}
+
 async function syncSaleToCloud(tx){
   if(!CLOUD.token||!CLOUD.bizId)return;
   try{
@@ -1917,30 +1979,11 @@ function renderAdmin(scr){
       toast('Not connected. Sign out and sign in again.');
       syncBtn.textContent='Sync now';syncBtn.style.opacity='1';return;
     }
-    // Test connection first
-    logSync('Testing connection...');
-    try{
-      let testRes=await fetch(SUPA_URL+'/rest/v1/businesses?id=eq.'+CLOUD.bizId,{headers:cloudHeaders()});
-      // If 401, try to auto-refresh the token before giving up
-      if(testRes.status===401&&CLOUD.refresh){
-        logSync('Token expired — attempting auto-refresh...');
-        const refreshed=await refreshSession();
-        if(refreshed){
-          logSync('Token refreshed — retrying...',true);
-          testRes=await fetch(SUPA_URL+'/rest/v1/businesses?id=eq.'+CLOUD.bizId,{headers:cloudHeaders()});
-        }
-      }
-      if(!testRes.ok){
-        logSync('Connection failed: HTTP '+testRes.status+(testRes.status===401?' — session expired, please sign out and sign in again':''),false);
-        toast('Session expired — sign out and sign in again.');
-        syncBtn.textContent='Sync now';syncBtn.style.opacity='1';return;
-      }
-      const bizData=await testRes.json();
-      logSync('Connected to: '+(bizData[0]&&bizData[0].name||'(unnamed business)'),true);
-    }catch(e){
-      logSync('Network error: '+e.message,false);
-      syncBtn.textContent='Sync now';syncBtn.style.opacity='1';return;
-    }
+    // Ensure session is valid — auto-refresh or show inline re-auth (no sign out needed)
+    logSync('Checking session...');
+    const authed=await ensureAuth();
+    if(!authed){logSync('Authentication cancelled.',false);syncBtn.textContent='Sync now';syncBtn.style.opacity='1';return;}
+    logSync('Session OK',true);
     // Push products
     logSync(S.prods.length>0?'Pushing '+S.prods.length+' products...':'No local products — pulling from cloud...');
     const prodOk=await saveProductsToCloud();
@@ -2948,8 +2991,9 @@ load();render();
 // Auto-sync from cloud on every app open if signed in
 (async function(){
   if(CLOUD.token&&CLOUD.bizId){
-    // Try to refresh token silently on every app open
+    // Silently refresh token on every open — no user interaction needed
     if(CLOUD.refresh)await refreshSession();
+    else await ensureAuth(); // Shows re-auth modal if token expired and no refresh token
     await loadCloudData(true);
     render();
   }
