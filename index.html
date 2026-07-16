@@ -461,23 +461,29 @@ let CLOUD={user:null,token:null,refresh:null,bizId:null};
 
 function cloudHeaders(){return{...H,'Authorization':'Bearer '+(CLOUD.token||SUPA_KEY)};}
 
-// Global 401 handler — auto-refresh token, then show inline re-auth if needed
+// Global 401/403 handler — auto-refresh token, then show inline re-auth if needed
 async function ensureAuth(){
   if(!CLOUD.token)return false;
   // Try a quick token check
   try{
     const r=await fetch(SUPA_URL+'/auth/v1/user',{headers:{'apikey':SUPA_KEY,'Authorization':'Bearer '+CLOUD.token}});
     if(r.ok)return true;
-    if(r.status===401){
+    // Handle 401 (expired) AND 403 (forbidden/invalid) — both mean token is bad
+    if(r.status===401||r.status===403){
       // Try refresh token first
       if(CLOUD.refresh){
+        console.log('[Arroyo] Token invalid ('+r.status+') — attempting refresh...');
         const ok=await refreshSession();
-        if(ok)return true;
+        if(ok){
+          console.log('[Arroyo] Token refreshed via ensureAuth');
+          return true;
+        }
       }
       // Refresh failed or no refresh token — show inline re-auth
+      console.log('[Arroyo] Refresh failed — showing re-auth modal');
       return await showReAuthModal();
     }
-  }catch(e){}
+  }catch(e){console.warn('[Arroyo] ensureAuth network error:',e);}
   return true; // Network error — let the actual call fail with its own error
 }
 
@@ -627,14 +633,15 @@ async function saveProductsToCloud(){
     await loadCloudData(true);
     return true;
   }
-  // Proactively refresh token before any write operation to avoid JWT expired mid-sync
-  if(CLOUD.refresh){await refreshSession();}
+  // Always ensure auth before writing — handles expired JWT and refresh token, shows re-auth if needed
+  const authOk=await ensureAuth();
+  if(!authOk){console.error('saveProductsToCloud: auth failed — aborting');return false;}
   try{
     let ch=cloudHeaders();
     let delRes=await fetch(SUPA_URL+'/rest/v1/products?biz_id=eq.'+CLOUD.bizId,{method:'DELETE',headers:ch});
-    // If 401 JWT expired — refresh and retry once
-    if(!delRes.ok&&delRes.status===401&&CLOUD.refresh){
-      console.log('[Arroyo] Token expired on DELETE — refreshing and retrying...');
+    // If still 401/403 after ensureAuth — one more refresh attempt then abort
+    if(!delRes.ok&&(delRes.status===401||delRes.status===403)){
+      console.log('[Arroyo] Token still invalid on DELETE after ensureAuth — final retry...');
       const refreshed=await refreshSession();
       if(refreshed){ch=cloudHeaders();delRes=await fetch(SUPA_URL+'/rest/v1/products?biz_id=eq.'+CLOUD.bizId,{method:'DELETE',headers:ch});}
     }
@@ -649,7 +656,8 @@ async function saveProductsToCloud(){
 }
 async function saveSettingsToCloud(){
   if(!CLOUD.token||!CLOUD.bizId)return false;
-  if(CLOUD.refresh){await refreshSession();}
+  const authOk=await ensureAuth();
+  if(!authOk)return false;
   try{
     const ch=cloudHeaders();
     const settings={
