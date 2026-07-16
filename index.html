@@ -38,6 +38,7 @@ input,select,textarea{user-select:text;-webkit-user-select:text}
 .topnav-brand{display:flex;align-items:center;padding:10px 14px 0;gap:8px}
 .brand-name{font-size:16px;font-weight:700;flex:1}
 .brand-tag{font-size:10px;font-weight:600;padding:3px 8px;border-radius:20px;background:var(--ac2);color:var(--ac)}
+.net-status-wrap{display:flex;align-items:center;gap:5px;font-size:10px;font-weight:700;color:var(--t3)}
 .topnav-tabs{display:flex;overflow-x:auto;padding:0 4px}
 .topnav-tabs::-webkit-scrollbar{height:0}
 .tab{flex:1;min-width:60px;padding:10px 8px;font-size:11px;font-weight:700;color:var(--t3);border:none;background:none;cursor:pointer;border-bottom:2.5px solid transparent;text-align:center;letter-spacing:0.3px;white-space:nowrap}
@@ -318,6 +319,21 @@ input,select,textarea{user-select:text;-webkit-user-select:text}
 /* Brand logo in nav */
 .brand-logo{width:32px;height:32px;border-radius:8px;object-fit:cover;flex-shrink:0}
 .brand-logo-ph{width:32px;height:32px;border-radius:8px;background:var(--ac2);display:flex;align-items:center;justify-content:center;font-size:11px;font-weight:800;color:var(--ac);flex-shrink:0}
+
+/* Online/Offline status */
+.net-dot{width:8px;height:8px;border-radius:50%;flex-shrink:0;transition:background 0.4s}
+.net-dot.online{background:var(--st)}
+.net-dot.offline{background:var(--dt);animation:pulse-red 1.2s ease-in-out infinite}
+@keyframes pulse-red{0%,100%{opacity:1}50%{opacity:0.4}}
+
+/* Cloud banner — shown when back online with pending queue */
+.cloud-banner{margin:6px 12px 0;border-radius:10px;padding:10px 14px;display:flex;align-items:center;gap:10px;flex-shrink:0;cursor:pointer;transition:opacity 0.2s}
+.cloud-banner.save{background:var(--sg);border:1.5px solid var(--st)}
+.cloud-banner.saving{background:var(--bg2);border:1.5px solid var(--b2);pointer-events:none}
+.cloud-banner span{font-size:12px;font-weight:700;flex:1}
+.cloud-banner.save span{color:var(--st)}
+.cloud-banner.saving span{color:var(--t2)}
+.cloud-banner-close{font-size:18px;background:none;border:none;cursor:pointer;padding:0 4px;line-height:1;color:inherit}
 .cashier-badge{font-size:10px;font-weight:700;padding:3px 8px;border-radius:20px;background:var(--bg3);color:var(--t3);cursor:pointer;white-space:nowrap;flex-shrink:0}
 
 /* Goal bar */
@@ -1050,6 +1066,7 @@ function render(){
   }
 
   renderTopNav(app);
+  renderCloudBanner(app);
 
   const scr=document.createElement('div');
   scr.className='screen';
@@ -1454,6 +1471,12 @@ function renderTopNav(app){
 
   const nm=document.createElement('div');nm.className='brand-name';nm.textContent=S.bizName;brand.appendChild(nm);
   const tag=document.createElement('span');tag.className='brand-tag';tag.textContent=b.label;brand.appendChild(tag);
+
+  // Network status dot
+  const nsw=document.createElement('div');nsw.className='net-status-wrap';
+  const ndot=document.createElement('div');ndot.id='netDot';ndot.className='net-dot '+(navigator.onLine?'online':'offline');
+  const nlbl=document.createElement('span');nlbl.id='netLbl';nlbl.textContent=navigator.onLine?'':'OFFLINE';
+  nsw.appendChild(ndot);nsw.appendChild(nlbl);brand.appendChild(nsw);
 
   if(S.activeCashier){
     const cb=document.createElement('span');cb.className='cashier-badge';cb.textContent=S.activeCashier.name;cb.title='Tap to end shift';
@@ -3096,19 +3119,110 @@ function renderModal(app){
   app.appendChild(ov);
 }
 
+// ── CLOUD BANNER (shown when back online with pending items, or session expired) ──
+let _bannerDismissed=false;
+function renderCloudBanner(app){
+  const pending=queueCount();
+  const offline=!navigator.onLine;
+  // Only show banner when online and there are pending items to push
+  if(offline||pending===0||_bannerDismissed||!CLOUD.token||!CLOUD.bizId)return;
+  const banner=document.createElement('div');banner.className='cloud-banner save';
+  const ico=document.createTextNode('☁️ ');
+  const lbl=document.createElement('span');lbl.textContent=pending+' offline item'+(pending>1?'s':'')+' — tap to save to cloud';
+  const cls=document.createElement('button');cls.className='cloud-banner-close';cls.innerHTML='&times;';
+  cls.onclick=function(e){e.stopPropagation();_bannerDismissed=true;banner.remove();};
+  banner.onclick=async function(){
+    banner.className='cloud-banner saving';lbl.textContent='Saving to cloud…';
+    const authed=await ensureAuth();
+    if(!authed){lbl.textContent='Session expired — sign in again';setTimeout(()=>banner.remove(),2500);return;}
+    const n=await flushSyncQueue(null);
+    _bannerDismissed=true;
+    toast('Saved '+pending+' item'+(pending>1?'s':'')+' to cloud ✓');
+    banner.remove();
+    await loadCloudData(true);render();
+  };
+  banner.appendChild(ico);banner.appendChild(lbl);banner.appendChild(cls);
+  app.appendChild(banner);
+}
+
+// ── PROACTIVE TOKEN REFRESH — schedule refresh before JWT expiry ──
+function scheduleTokenRefresh(){
+  if(!CLOUD.token)return;
+  try{
+    // Parse JWT exp claim (no library needed — it's base64url)
+    const payload=JSON.parse(atob(CLOUD.token.split('.')[1].replace(/-/g,'+').replace(/_/g,'/')));
+    if(!payload.exp)return;
+    const msUntilExpiry=(payload.exp*1000)-Date.now();
+    // Refresh 5 minutes before expiry (or immediately if already within 5 min)
+    const refreshIn=Math.max(0,msUntilExpiry-5*60*1000);
+    console.log('[Arroyo] Token refresh scheduled in '+(refreshIn/1000/60).toFixed(1)+'m');
+    setTimeout(async function(){
+      if(!CLOUD.token)return;
+      const ok=await refreshSession();
+      if(ok){
+        console.log('[Arroyo] Proactive token refresh succeeded');
+        scheduleTokenRefresh(); // schedule next refresh
+      } else {
+        // Refresh failed — show re-auth when user next tries an action
+        // Don't interrupt them silently — they'll get the re-auth modal on next sync/action
+        console.warn('[Arroyo] Proactive token refresh failed — will re-auth on next action');
+        // Show a subtle notification dot change
+        const dot=document.getElementById('netDot');
+        const lbl=document.getElementById('netLbl');
+        if(dot){dot.style.background='var(--wt)';}
+        if(lbl){lbl.textContent='SESSION';}
+      }
+    },refreshIn);
+  }catch(e){console.warn('[Arroyo] scheduleTokenRefresh error:',e);}
+}
+
+// ── ONLINE / OFFLINE EVENT HANDLERS ──
+window.addEventListener('offline',function(){
+  const dot=document.getElementById('netDot');
+  const lbl=document.getElementById('netLbl');
+  if(dot){dot.className='net-dot offline';}
+  if(lbl){lbl.textContent='OFFLINE';}
+  toast('You\'re offline — sales save locally ✓');
+});
+
+window.addEventListener('online',async function(){
+  const dot=document.getElementById('netDot');
+  const lbl=document.getElementById('netLbl');
+  if(dot){dot.className='net-dot online';}
+  if(lbl){lbl.textContent='';}
+
+  if(!CLOUD.token||!CLOUD.bizId)return;
+
+  const pending=queueCount();
+  if(pending>0){
+    // Reset banner dismissed state so the banner shows again
+    _bannerDismissed=false;
+    render(); // re-render shows the cloud banner
+  } else {
+    // No pending items — just silently pull latest from cloud
+    toast('Back online — syncing…');
+    const authed=await ensureAuth();
+    if(authed){await loadCloudData(true);render();toast('Synced ✓');}
+  }
+});
+
 load();render();
 // Auto-sync from cloud on every app open if signed in
 (async function(){
   if(CLOUD.token&&CLOUD.bizId){
-    // Silently refresh token on every open — no user interaction needed
-    if(CLOUD.refresh)await refreshSession();
-    else await ensureAuth(); // Shows re-auth modal if token expired and no refresh token
+    // Proactively refresh token on every app open, then schedule future refreshes
+    if(CLOUD.refresh){
+      await refreshSession();
+    } else {
+      await ensureAuth();
+    }
+    scheduleTokenRefresh();
     // Flush any offline queue first before pulling from cloud
     const pending=queueCount();
     if(pending>0){
       console.log('[Arroyo] Auto-flushing '+pending+' offline item(s) on app open...');
       await flushSyncQueue(null);
-      toast('Synced '+pending+' offline item(s) ✓');
+      toast('Synced '+pending+' offline item'+(pending>1?'s':'')+' ✓');
     }
     await loadCloudData(true);
     render();
