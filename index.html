@@ -991,7 +991,12 @@ function sub(){return S.cart.reduce((s,i)=>s+i.price*i.qty,0);}
 function damt(){const s=sub();return S.discType==='%'?s*Math.min(S.disc,100)/100:Math.min(S.disc,s);}
 function tamt(){return 0;}
 function tot(){return sub()-damt()+tamt();}
-function txId(){return'TXN-'+String(S.sales.length+1).padStart(5,'0');}
+function txId(){
+  // Timestamp (base36) + 4 random chars = globally unique across devices
+  const ts=Date.now().toString(36).toUpperCase();
+  const rnd=Math.random().toString(36).substr(2,4).toUpperCase();
+  return'TXN-'+ts+'-'+rnd;
+}
 function cc(){return S.cart.reduce((s,i)=>s+i.qty,0);}
 
 function initBiz(id){
