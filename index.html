@@ -529,23 +529,106 @@ function showReAuthModal(){
   });
 }
 
+// ── OFFLINE SYNC QUEUE ──────────────────────────────────────────
+// Saves failed syncs to localStorage and retries when internet returns.
+// Queue format: [{type:'sale'|'expense'|'void', data:{...}, ts:timestamp}]
+
+function queueLoad(){
+  try{return JSON.parse(localStorage.getItem('arroyo_sync_queue')||'[]');}catch(e){return[];}
+}
+function queueSave(q){
+  try{localStorage.setItem('arroyo_sync_queue',JSON.stringify(q));}catch(e){}
+}
+function queueAdd(type,data){
+  const q=queueLoad();
+  // Deduplicate: don't queue the same txn_id or expense+date twice
+  if(type==='sale'&&q.some(x=>x.type==='sale'&&x.data.txn_id===data.txn_id))return;
+  if(type==='void'&&q.some(x=>x.type==='void'&&x.data.txn_id===data.txn_id))return;
+  q.push({type,data,ts:Date.now()});
+  queueSave(q);
+  console.log('[Arroyo] Queued offline '+type+':',data.txn_id||data.name||'');
+}
+function queueCount(){return queueLoad().length;}
+
+async function flushSyncQueue(logFn){
+  const q=queueLoad();
+  if(!q.length)return 0;
+  if(!CLOUD.token||!CLOUD.bizId){
+    if(logFn)logFn('Skipping queue flush — not connected');
+    return 0;
+  }
+  if(logFn)logFn('Flushing '+q.length+' offline item(s)...');
+  const failed=[];
+  let pushed=0;
+  for(const item of q){
+    // Inject current bizId for items queued while offline (bizId was null)
+    if(!item.data.biz_id&&CLOUD.bizId)item.data.biz_id=CLOUD.bizId;
+    try{
+      let ok=false;
+      if(item.type==='sale'){
+        const r=await fetch(SUPA_URL+'/rest/v1/sales',{method:'POST',headers:cloudHeaders(),body:JSON.stringify(item.data)});
+        // 409 conflict = already exists (duplicate) — treat as success
+        ok=r.ok||r.status===409||r.status===23505;
+      } else if(item.type==='expense'){
+        const r=await fetch(SUPA_URL+'/rest/v1/expenses',{method:'POST',headers:cloudHeaders(),body:JSON.stringify(item.data)});
+        ok=r.ok;
+      } else if(item.type==='void'){
+        const r=await fetch(SUPA_URL+'/rest/v1/sales?txn_id=eq.'+item.data.txn_id+'&biz_id=eq.'+CLOUD.bizId,{method:'PATCH',headers:{...cloudHeaders(),'Prefer':'return=representation'},body:JSON.stringify({voided:true})});
+        ok=r.ok;
+      }
+      if(ok){pushed++;}else{failed.push(item);}
+    }catch(e){failed.push(item);}
+  }
+  queueSave(failed);
+  if(logFn){
+    if(pushed>0)logFn('Pushed '+pushed+' offline item(s) ✓',true);
+    if(failed.length>0)logFn(failed.length+' item(s) still pending (will retry next sync)',null);
+  }
+  console.log('[Arroyo] Queue flush: pushed='+pushed+' failed='+failed.length);
+  return pushed;
+}
+
 async function syncSaleToCloud(tx){
-  if(!CLOUD.token||!CLOUD.bizId)return;
+  if(!CLOUD.token||!CLOUD.bizId){
+    // Not connected — queue for later
+    queueAdd('sale',{biz_id:null,txn_id:tx.id,date:tx.date,total:tx.total,method:tx.method,items:tx.items,discount:tx.disc||0,cashier:tx.cashier||'',ref:tx.ref||'',voided:tx.voided||false});
+    return;
+  }
+  const payload={biz_id:CLOUD.bizId,txn_id:tx.id,date:tx.date,total:tx.total,method:tx.method,items:tx.items,discount:tx.disc||0,cashier:tx.cashier||'',ref:tx.ref||'',voided:tx.voided||false};
   try{
-    await fetch(SUPA_URL+'/rest/v1/sales',{method:'POST',headers:cloudHeaders(),body:JSON.stringify({
-      biz_id:CLOUD.bizId,txn_id:tx.id,date:tx.date,total:tx.total,method:tx.method,
-      items:tx.items,discount:tx.disc||0,cashier:tx.cashier||'',ref:tx.ref||'',voided:tx.voided||false
-    })});
-  }catch(e){}
+    const r=await fetch(SUPA_URL+'/rest/v1/sales',{method:'POST',headers:cloudHeaders(),body:JSON.stringify(payload)});
+    if(!r.ok&&r.status!==409){
+      // Failed — add to queue
+      queueAdd('sale',payload);
+      console.warn('[Arroyo] Sale sync failed, queued:',tx.id);
+    }
+  }catch(e){
+    // Network error — queue it
+    queueAdd('sale',payload);
+    console.warn('[Arroyo] Sale sync offline, queued:',tx.id);
+  }
 }
 async function syncExpenseToCloud(exp){
-  if(!CLOUD.token||!CLOUD.bizId)return;
+  if(!CLOUD.token||!CLOUD.bizId){
+    queueAdd('expense',{biz_id:null,name:exp.name,amount:exp.amount,cat:exp.cat,date:exp.date});
+    return;
+  }
+  const payload={biz_id:CLOUD.bizId,name:exp.name,amount:exp.amount,cat:exp.cat,date:exp.date};
   try{
-    await fetch(SUPA_URL+'/rest/v1/expenses',{method:'POST',headers:cloudHeaders(),body:JSON.stringify({
-      biz_id:CLOUD.bizId,name:exp.name,amount:exp.amount,cat:exp.cat,date:exp.date
-    })});
-  }catch(e){}
+    const r=await fetch(SUPA_URL+'/rest/v1/expenses',{method:'POST',headers:cloudHeaders(),body:JSON.stringify(payload)});
+    if(!r.ok)queueAdd('expense',payload);
+  }catch(e){queueAdd('expense',payload);}
 }
+async function syncVoidToCloud(txnId){
+  if(!CLOUD.token||!CLOUD.bizId){
+    queueAdd('void',{txn_id:txnId});return;
+  }
+  try{
+    const r=await fetch(SUPA_URL+'/rest/v1/sales?txn_id=eq.'+txnId+'&biz_id=eq.'+CLOUD.bizId,{method:'PATCH',headers:{...cloudHeaders(),'Prefer':'return=representation'},body:JSON.stringify({voided:true})});
+    if(!r.ok)queueAdd('void',{txn_id:txnId});
+  }catch(e){queueAdd('void',{txn_id:txnId});}
+}
+// ── END OFFLINE SYNC QUEUE ───────────────────────────────────────
 async function loadCloudCustomers(){
   if(!CLOUD.token||!CLOUD.bizId)return;
   try{
@@ -1991,6 +2074,8 @@ function renderAdmin(scr){
     logSync('Token: '+(CLOUD.token?'present ('+CLOUD.token.slice(0,12)+'...)':'MISSING'),!!CLOUD.token);
     logSync('BizId: '+(CLOUD.bizId||'MISSING'),!!CLOUD.bizId);
     logSync('Products local: '+S.prods.length+' items');
+    const offlineCount=queueCount();
+    if(offlineCount>0)logSync('Offline queue: '+offlineCount+' item(s) waiting to push');
     if(!CLOUD.token||!CLOUD.bizId){
       logSync('Cannot sync — not connected. Sign out and sign in again.',false);
       toast('Not connected. Sign out and sign in again.');
@@ -2001,6 +2086,14 @@ function renderAdmin(scr){
     const authed=await ensureAuth();
     if(!authed){logSync('Authentication cancelled.',false);syncBtn.textContent='Sync now';syncBtn.style.opacity='1';return;}
     logSync('Session OK',true);
+    // Flush offline queue first — push any sales/expenses recorded while offline
+    const pending=queueCount();
+    if(pending>0){
+      logSync('Found '+pending+' offline item(s) to push...');
+      await flushSyncQueue(logSync);
+    } else {
+      logSync('No offline items pending');
+    }
     // Push products
     logSync(S.prods.length>0?'Pushing '+S.prods.length+' products...':'No local products — pulling from cloud...');
     const prodOk=await saveProductsToCloud();
@@ -2232,6 +2325,7 @@ function renderAdmin(scr){
   factBtn.onclick=function(){if(confirm('Wipe ALL data?')){if(confirm('Final confirmation?')){
     localStorage.removeItem('arroyo_pos');
     localStorage.removeItem('arroyo_cloud');
+    localStorage.removeItem('arroyo_sync_queue');
     CLOUD={user:null,token:null,bizId:null};
     S={screen:'biz',biz:null,bizName:'',prods:[],cats:[],cart:[],cat:'All',search:'',disc:0,discType:'%',pass:'1234',locked:true,nid:10,sales:[],salesTotal:0,modal:null,histFilter:'all',cashTendered:0,themeColor:'#111110',cartOpen:false,cashiers:[],cashierNid:1,activeCashier:null,shiftStart:null,alertDismissed:false,cloudEmail:'',cloudBizName:'',authScreen:'login',selectedCustomer:null,chargeToUtang:false,cloudCustomers:[],cloudAttEmployees:[],expenses:[],expenseNid:1,expFilter:'today',dailyGoal:0,requireRef:false,bizLogo:null};
     render();
@@ -2590,10 +2684,8 @@ function renderModal(app){
           if(tx){tx.voided=true;S.salesTotal=Math.max(0,S.salesTotal-tx.total);
             tx.items.forEach(it=>{const p=S.prods.find(x=>x.name===it.name);if(p&&p.stock!==999)p.stock+=it.qty;});}
           save();
-          // Sync void to cloud so dashboard reflects it
-          if(CLOUD.token&&CLOUD.bizId){
-            fetch(SUPA_URL+'/rest/v1/sales?txn_id=eq.'+m.tx.id+'&biz_id=eq.'+CLOUD.bizId,{method:'PATCH',headers:{...cloudHeaders(),'Prefer':'return=representation'},body:JSON.stringify({voided:true})}).catch(function(){});
-          }
+          // Sync void to cloud — queues if offline
+          syncVoidToCloud(m.tx.id);
           closeModal();toast('Transaction voided');
         }
       };
@@ -3011,6 +3103,13 @@ load();render();
     // Silently refresh token on every open — no user interaction needed
     if(CLOUD.refresh)await refreshSession();
     else await ensureAuth(); // Shows re-auth modal if token expired and no refresh token
+    // Flush any offline queue first before pulling from cloud
+    const pending=queueCount();
+    if(pending>0){
+      console.log('[Arroyo] Auto-flushing '+pending+' offline item(s) on app open...');
+      await flushSyncQueue(null);
+      toast('Synced '+pending+' offline item(s) ✓');
+    }
     await loadCloudData(true);
     render();
   }
