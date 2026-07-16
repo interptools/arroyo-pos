@@ -675,18 +675,22 @@ async function applyUpdate(){
     ]);
     if(!posRes.ok||!dashRes.ok){toast('Download failed. Try again.');return false;}
     const [posHtml,dashHtml]=await Promise.all([posRes.text(),dashRes.text()]);
-    localStorage.setItem('arroyo_pos_update',posHtml);
-    localStorage.setItem('arroyo_dash_update',dashHtml);
-    toast('Update downloaded! Reloading...');
-    setTimeout(function(){
-      const pending=localStorage.getItem('arroyo_pos_update');
-      if(pending){
-        localStorage.removeItem('arroyo_pos_update');
-        document.open('text/html');document.write(pending);document.close();
-      } else {
-        window.location.reload();
-      }
-    },1200);
+    // Save dashboard update for when dashboard is next opened
+    try{localStorage.setItem('arroyo_dash_update',dashHtml);}catch(e){}
+    // Save POS update as fallback (used by load() on next boot if write fails)
+    try{localStorage.setItem('arroyo_pos_update',posHtml);}catch(e){}
+    toast('Update ready! Applying...');
+    // Apply POS update immediately — document.write must be called directly
+    // from the user gesture context, NOT inside setTimeout (breaks iOS Safari)
+    try{
+      document.open('text/html');
+      document.write(posHtml);
+      document.close();
+    }catch(e){
+      // Fallback for browsers that block document.write: force reload
+      // load() will pick up arroyo_pos_update from localStorage on next boot
+      window.location.reload(true);
+    }
     return true;
   }catch(e){toast('Update failed: '+e.message);return false;}
 }
