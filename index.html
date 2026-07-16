@@ -438,11 +438,26 @@ async function signIn(email,password){
     return await r.json();
   }catch(e){return{error:{message:'Network error'}};}
 }
+async function refreshSession(){
+  if(!CLOUD.refresh)return false;
+  try{
+    const r=await fetch(SUPA_URL+'/auth/v1/token?grant_type=refresh_token',{method:'POST',headers:{'apikey':SUPA_KEY,'Content-Type':'application/json'},body:JSON.stringify({refresh_token:CLOUD.refresh})});
+    const res=await r.json();
+    if(res.access_token){
+      CLOUD.token=res.access_token;
+      if(res.refresh_token)CLOUD.refresh=res.refresh_token;
+      localStorage.setItem('arroyo_cloud',JSON.stringify({user:CLOUD.user,token:CLOUD.token,refresh:CLOUD.refresh,bizId:CLOUD.bizId,email:S.cloudEmail,bizName:S.cloudBizName}));
+      console.log('[Arroyo] Token refreshed successfully');
+      return true;
+    }
+    return false;
+  }catch(e){return false;}
+}
 async function signOut(token){
   try{await fetch(SUPA_URL+'/auth/v1/logout',{method:'POST',headers:{'apikey':SUPA_KEY,'Authorization':'Bearer '+token}});}catch(e){}
 }
 
-let CLOUD={user:null,token:null,bizId:null};
+let CLOUD={user:null,token:null,refresh:null,bizId:null};
 
 function cloudHeaders(){return{...H,'Authorization':'Bearer '+(CLOUD.token||SUPA_KEY)};}
 
@@ -724,7 +739,7 @@ function load(){
     if(d.shiftStart)S.shiftStart=d.shiftStart;
     // Restore cloud session
     const ct=localStorage.getItem('arroyo_cloud');
-    if(ct){try{const c=JSON.parse(ct);CLOUD.user=c.user;CLOUD.token=c.token;CLOUD.bizId=c.bizId;S.cloudEmail=c.email||'';S.cloudBizName=c.bizName||'';}catch(e){}}
+    if(ct){try{const c=JSON.parse(ct);CLOUD.user=c.user;CLOUD.token=c.token;CLOUD.refresh=c.refresh||null;CLOUD.bizId=c.bizId;S.cloudEmail=c.email||'';S.cloudBizName=c.bizName||'';}catch(e){}}
   }catch(e){}
 }
 
@@ -739,7 +754,7 @@ function save(){
       cashiers:S.cashiers,cashierNid:S.cashierNid,
       activeCashier:S.activeCashier,shiftStart:S.shiftStart
     }));
-    if(CLOUD.token)localStorage.setItem('arroyo_cloud',JSON.stringify({user:CLOUD.user,token:CLOUD.token,bizId:CLOUD.bizId,email:S.cloudEmail,bizName:S.cloudBizName}));
+    if(CLOUD.token)localStorage.setItem('arroyo_cloud',JSON.stringify({user:CLOUD.user,token:CLOUD.token,refresh:CLOUD.refresh,bizId:CLOUD.bizId,email:S.cloudEmail,bizName:S.cloudBizName}));
   }catch(e){}
 }
 
@@ -1099,7 +1114,7 @@ function renderWizard(app){
             if(created&&created[0])CLOUD.bizId=created[0].id;
           }
           save();saveSession&&saveSession();
-          localStorage.setItem('arroyo_cloud',JSON.stringify({user:CLOUD.user,token:CLOUD.token,bizId:CLOUD.bizId,email:S.cloudEmail,bizName:WIZ.bizName}));
+          localStorage.setItem('arroyo_cloud',JSON.stringify({user:CLOUD.user,token:CLOUD.token,refresh:CLOUD.refresh,bizId:CLOUD.bizId,email:S.cloudEmail,bizName:WIZ.bizName}));
         }catch(e){console.error('Wizard biz sync error:',e);}
       }
       S.screen='pos';save();render();toast('Welcome to '+S.bizName+'! 🎉');
@@ -1181,6 +1196,7 @@ function renderCloudAuth(app){
       const res=await signIn(email,pass);
       if(res.error||!res.access_token){err.textContent=res.error?.message||'Sign in failed. Check your email and password.';btn.className='auth-btn';btn.textContent='Sign in';return;}
       CLOUD.token=res.access_token;CLOUD.user=res.user?.id||email;
+      if(res.refresh_token)CLOUD.refresh=res.refresh_token;
       S.cloudEmail=email;
       // Get biz record
       const h2={...H,'Authorization':'Bearer '+res.access_token};
@@ -1197,6 +1213,7 @@ function renderCloudAuth(app){
       const loginRes=await signIn(email,pass);
       if(!loginRes.access_token){err.textContent='Account created! Please sign in.';S.authScreen='login';render();return;}
       CLOUD.token=loginRes.access_token;CLOUD.user=loginRes.user?.id||email;S.cloudEmail=email;S.cloudBizName=bizName;
+      if(loginRes.refresh_token)CLOUD.refresh=loginRes.refresh_token;
       // Create biz record
       const h2={...H,'Authorization':'Bearer '+loginRes.access_token};
       const bizRes=await fetch(SUPA_URL+'/rest/v1/businesses',{method:'POST',headers:{...h2,'Prefer':'return=representation'},body:JSON.stringify({user_id:loginRes.user.id,name:bizName,biz_type:'custom'})});
@@ -1903,10 +1920,18 @@ function renderAdmin(scr){
     // Test connection first
     logSync('Testing connection...');
     try{
-      const testRes=await fetch(SUPA_URL+'/rest/v1/businesses?id=eq.'+CLOUD.bizId,{headers:cloudHeaders()});
+      let testRes=await fetch(SUPA_URL+'/rest/v1/businesses?id=eq.'+CLOUD.bizId,{headers:cloudHeaders()});
+      // If 401, try to auto-refresh the token before giving up
+      if(testRes.status===401&&CLOUD.refresh){
+        logSync('Token expired — attempting auto-refresh...');
+        const refreshed=await refreshSession();
+        if(refreshed){
+          logSync('Token refreshed — retrying...',true);
+          testRes=await fetch(SUPA_URL+'/rest/v1/businesses?id=eq.'+CLOUD.bizId,{headers:cloudHeaders()});
+        }
+      }
       if(!testRes.ok){
-        logSync('Connection test failed: HTTP '+testRes.status+' — session expired',false);
-        logSync('→ Sign out and sign in again to refresh your session',false);
+        logSync('Connection failed: HTTP '+testRes.status+(testRes.status===401?' — session expired, please sign out and sign in again':''),false);
         toast('Session expired — sign out and sign in again.');
         syncBtn.textContent='Sync now';syncBtn.style.opacity='1';return;
       }
@@ -2923,6 +2948,8 @@ load();render();
 // Auto-sync from cloud on every app open if signed in
 (async function(){
   if(CLOUD.token&&CLOUD.bizId){
+    // Try to refresh token silently on every app open
+    if(CLOUD.refresh)await refreshSession();
     await loadCloudData(true);
     render();
   }
