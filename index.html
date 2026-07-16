@@ -1667,7 +1667,7 @@ function renderAtt(scr){
     btn.textContent=e.clockedIn?'Clock Out':'Clock In';
     btn.onclick=async function(){
       btn.disabled=true;btn.style.opacity='0.5';
-      const h2={...H,'Prefer':'return=representation'};
+      const h2={...cloudHeaders(),'Prefer':'return=representation'};
       const today=new Date().toISOString().slice(0,10);
       if(e.clockedIn){
         // Clock out - find the open attendance record
